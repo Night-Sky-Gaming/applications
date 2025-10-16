@@ -1,2 +1,2 @@
 # applications
-New members applications bot for Andromeda Gaming
+### New members applications bot for Andromeda Gaming
