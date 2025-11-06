@@ -109,31 +109,29 @@ module.exports = {
 								await member.roles.remove(applicantRole);
 							}
 
-							// Add game roles if they exist
-							const rolesAdded = [];
-							const rolesMissing = [];
+							// Add ONLY the main game role (not other games)
+							let mainGameRoleAdded = false;
+							let mainGameRoleMissing = false;
 
-							if (appData && appData.games) {
-								for (const gameName of appData.games) {
-									const gameRole = guild.roles.cache.find(
-										(role) => role.name === gameName,
-									);
-									if (gameRole) {
-										try {
-											await member.roles.add(gameRole);
-											rolesAdded.push(gameName);
-										}
-										catch (roleError) {
-											console.error(
-												`Error adding role ${gameName}:`,
-												roleError.message,
-											);
-											rolesMissing.push(gameName);
-										}
+							if (appData && appData.mainGame) {
+								const mainGameRole = guild.roles.cache.find(
+									(role) => role.name === appData.mainGame,
+								);
+								if (mainGameRole) {
+									try {
+										await member.roles.add(mainGameRole);
+										mainGameRoleAdded = true;
 									}
-									else {
-										rolesMissing.push(gameName);
+									catch (roleError) {
+										console.error(
+											`Error adding main game role ${appData.mainGame}:`,
+											roleError.message,
+										);
+										mainGameRoleMissing = true;
 									}
+								}
+								else {
+									mainGameRoleMissing = true;
 								}
 							}
 
@@ -148,17 +146,24 @@ module.exports = {
 									inline: true,
 								});
 
-							if (rolesAdded.length > 0) {
+							if (mainGameRoleAdded) {
 								acceptedEmbed.addFields({
-									name: 'Game Roles Added',
-									value: rolesAdded.join(', '),
+									name: 'Main Game Role Added',
+									value: appData.mainGame,
 								});
 							}
 
-							if (rolesMissing.length > 0) {
+							if (mainGameRoleMissing) {
 								acceptedEmbed.addFields({
-									name: '⚠️ Game Roles Missing',
-									value: rolesMissing.join(', '),
+									name: '⚠️ Main Game Role Missing',
+									value: appData.mainGame || 'Unknown',
+								});
+							}
+
+							if (appData && appData.otherGames && appData.otherGames.length > 0) {
+								acceptedEmbed.addFields({
+									name: 'ℹ️ Other Games (Level 5+ Access)',
+									value: appData.otherGames.join(', '),
 								});
 							}
 
@@ -318,6 +323,28 @@ module.exports = {
 				// Show the modal
 				await interaction.showModal(modal);
 			}
+			// Handle skip other games button
+			else if (interaction.customId.startsWith('skip_other_games_')) {
+				// Get the stored application data
+				if (
+					!interaction.client.pendingApplications ||
+					!interaction.client.pendingApplications.has(interaction.user.id)
+				) {
+					await interaction.reply({
+						content:
+							'Your application data expired. Please submit your application again.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				const appData = interaction.client.pendingApplications.get(
+					interaction.user.id,
+				);
+				
+				// Complete the application with no other games
+				await completeApplicationSubmission(interaction, appData, []);
+			}
 		}
 		// Handle modal submissions
 		else if (interaction.isModalSubmit()) {
@@ -334,12 +361,12 @@ module.exports = {
 					.getTextInputValue('reason_input')
 					.trim();
 
-				// Create a select menu for games
-				const gamesSelect = new StringSelectMenuBuilder()
-					.setCustomId(`games_select_${interaction.user.id}`)
-					.setPlaceholder('Select the games you play')
+				// Create a select menu for main game (single selection)
+				const mainGameSelect = new StringSelectMenuBuilder()
+					.setCustomId(`main_game_select_${interaction.user.id}`)
+					.setPlaceholder('Select your MAIN game')
 					.setMinValues(1)
-					.setMaxValues(8)
+					.setMaxValues(1)
 					.addOptions(
 						new StringSelectMenuOptionBuilder()
 							.setLabel('Fortnite')
@@ -363,7 +390,7 @@ module.exports = {
 							.setValue('MOBA'),
 					);
 
-				const selectRow = new ActionRowBuilder().addComponents(gamesSelect);
+				const selectRow = new ActionRowBuilder().addComponents(mainGameSelect);
 
 				// Store the application data temporarily (we'll use this when they select games)
 				// We'll store it in the client's temporary storage
@@ -378,11 +405,12 @@ module.exports = {
 					reason,
 				});
 
-				// Send the games selection menu
+				// Send the main game selection menu
 				const selectEmbed = new EmbedBuilder()
-					.setTitle('📝 Select Your Games')
+					.setTitle('📝 Select Your Main Game')
 					.setDescription(
-						'Please select the games you play from the dropdown menu below:',
+						'Please select your **MAIN game** from the dropdown menu below.\n\n' +
+						'You will receive the role for this game upon acceptance.',
 					)
 					.setColor(0x5865f2)
 					.setTimestamp();
@@ -396,7 +424,8 @@ module.exports = {
 		}
 		// Handle select menu interactions
 		else if (interaction.isStringSelectMenu()) {
-			if (interaction.customId.startsWith('games_select_')) {
+			// Handle main game selection
+			if (interaction.customId.startsWith('main_game_select_')) {
 				// Get the stored application data
 				if (
 					!interaction.client.pendingApplications ||
@@ -413,234 +442,331 @@ module.exports = {
 				const appData = interaction.client.pendingApplications.get(
 					interaction.user.id,
 				);
-				// Array of selected game names
-				const selectedGames = interaction.values;
+				
+				// Get the selected main game (only one)
+				const mainGame = interaction.values[0];
+				
+				// Store main game in application data
+				appData.mainGame = mainGame;
+				interaction.client.pendingApplications.set(interaction.user.id, appData);
 
-				// Get the guild
-				const guild = interaction.client.guilds.cache.first();
+				// Create a select menu for other games (multiple selection)
+				const otherGamesSelect = new StringSelectMenuBuilder()
+					.setCustomId(`other_games_select_${interaction.user.id}`)
+					.setPlaceholder('Select other games you play (optional)')
+					.setMinValues(0)
+					.setMaxValues(7) // Max 7 since they already selected 1 as main
+					.addOptions(
+						new StringSelectMenuOptionBuilder()
+							.setLabel('Fortnite')
+							.setValue('Fortnite'),
+						new StringSelectMenuOptionBuilder()
+							.setLabel('R6 Siege X')
+							.setValue('R6 Siege X'),
+						new StringSelectMenuOptionBuilder()
+							.setLabel('Overwatch')
+							.setValue('Overwatch'),
+						new StringSelectMenuOptionBuilder()
+							.setLabel('Magic the Gathering')
+							.setValue('Magic the Gathering'),
+						new StringSelectMenuOptionBuilder().setLabel('BR').setValue('BR'),
+						new StringSelectMenuOptionBuilder().setLabel('FPS').setValue('FPS'),
+						new StringSelectMenuOptionBuilder()
+							.setLabel('Tabletop')
+							.setValue('Tabletop'),
+						new StringSelectMenuOptionBuilder()
+							.setLabel('MOBA')
+							.setValue('MOBA'),
+					);
 
-				if (!guild) {
+				const selectRow = new ActionRowBuilder().addComponents(otherGamesSelect);
+
+				// Add a skip button for users who only play their main game
+				const skipButton = new ButtonBuilder()
+					.setCustomId(`skip_other_games_${interaction.user.id}`)
+					.setLabel('Skip - I only play my main game')
+					.setStyle(ButtonStyle.Secondary);
+
+				const buttonRow = new ActionRowBuilder().addComponents(skipButton);
+
+				// Send the other games selection menu
+				const selectEmbed = new EmbedBuilder()
+					.setTitle('📝 Select Other Games (Optional)')
+					.setDescription(
+						`**Your Main Game:** ${mainGame}\n\n` +
+						'Select any **other games** you play from the dropdown menu below.\n\n' +
+						'⚠️ **Note:** You will get access to these game channels once you reach **Level 5**.\n\n' +
+						'If you only play your main game, click the "Skip" button.',
+					)
+					.setColor(0x5865f2)
+					.setTimestamp();
+
+				await interaction.update({
+					embeds: [selectEmbed],
+					components: [selectRow, buttonRow],
+				});
+			}
+			// Handle other games selection
+			else if (interaction.customId.startsWith('other_games_select_')) {
+				// Get the stored application data
+				if (
+					!interaction.client.pendingApplications ||
+					!interaction.client.pendingApplications.has(interaction.user.id)
+				) {
 					await interaction.reply({
-						content: 'Unable to find the server. Please try again later.',
+						content:
+							'Your application data expired. Please submit your application again.',
 						flags: MessageFlags.Ephemeral,
 					});
 					return;
 				}
 
-				try {
-					// Fetch the member from the guild
-					const member = await guild.members.fetch(interaction.user.id);
-
-					if (!member) {
-						await interaction.reply({
-							content:
-								'Unable to find you in the server. Please try again later.',
-							flags: MessageFlags.Ephemeral,
-						});
-						return;
-					}
-
-					// Try to find the "Applicant" role
-					const applicantRole = guild.roles.cache.find(
-						(role) => role.name === 'Applicant',
-					);
-
-					if (!applicantRole) {
-						console.error('Applicant role not found!');
-
-						// Send error message to default text channel
-						const defaultChannel =
-							guild.systemChannel ||
-							guild.channels.cache.find(
-								(channel) =>
-									channel.type === ChannelType.GuildText &&
-									channel.permissionsFor(guild.members.me).has('SendMessages'),
-							);
-
-						if (defaultChannel) {
-							const errorEmbed = new EmbedBuilder()
-								.setTitle('⚠️ Configuration Error')
-								.setDescription(
-									'The "Applicant" role does not exist. Please create a role named "Applicant" for the application system to work properly.',
-								)
-								.setColor(0xff0000)
-								.setTimestamp();
-
-							await defaultChannel.send({ embeds: [errorEmbed] });
-						}
-
-						await interaction.reply({
-							content:
-								'There was an error processing your application. The Applicant role is not configured. Please contact a server administrator.',
-							flags: MessageFlags.Ephemeral,
-						});
-						return;
-					}
-
-					// Add the Applicant role to the user
-					let roleAdded = true;
-					try {
-						await member.roles.add(applicantRole);
-					}
-					catch (roleError) {
-						roleAdded = false;
-						console.error('Error adding Applicant role:', roleError.message);
-					}
-
-					// Change the user's nickname to their username
-					let nicknameChanged = true;
-					let nicknameErrorReason = '';
-					try {
-						// Check if we can actually change the nickname before attempting
-						if (member.id === guild.ownerId) {
-							nicknameChanged = false;
-							nicknameErrorReason = 'You are the server owner';
-						}
-						else if (!guild.members.me.permissions.has('ManageNicknames')) {
-							nicknameChanged = false;
-							nicknameErrorReason = 'Bot lacks Manage Nicknames permission';
-						}
-						else if (
-							member.roles.highest.position >=
-							guild.members.me.roles.highest.position
-						) {
-							nicknameChanged = false;
-							nicknameErrorReason =
-								'Your role is higher than or equal to the bot\'s role';
-						}
-						else {
-							await member.setNickname(appData.username);
-						}
-					}
-					catch (nickError) {
-						nicknameChanged = false;
-						nicknameErrorReason = nickError.message;
-						console.error('Error setting nickname:', nickError.message);
-					}
-
-					// Send success message
-					let descriptionText =
-						'Your application has been submitted for review!';
-
-					// Add warnings if something didn't work
-					if (!roleAdded) {
-						descriptionText +=
-							'\n\n⚠️ **Error:** Could not add the Applicant role. Please contact an administrator.';
-					}
-					if (!nicknameChanged) {
-						descriptionText += `\n\n⚠️ **Note:** Could not change your nickname automatically (${nicknameErrorReason}). Please contact a moderator if you want your nickname changed.`;
-					}
-
-					const successEmbed = new EmbedBuilder()
-						.setTitle(
-							roleAdded
-								? '✅ Application Submitted!'
-								: '⚠️ Application Submitted (with issues)',
-						)
-						.setDescription(descriptionText)
-						.setColor(roleAdded && nicknameChanged ? 0x00ff00 : 0xffa500)
-						.addFields(
-							{ name: 'Username', value: appData.username, inline: true },
-							{ name: 'Age', value: appData.age, inline: true },
-							{ name: 'Recruiter', value: appData.recruiter, inline: true },
-							{ name: 'Why join?', value: appData.reason },
-							{ name: 'Games', value: selectedGames.join(', ') },
-						)
-						.setFooter({
-							text: 'Your application is pending moderator review!',
-						})
-						.setTimestamp();
-
-					await interaction.update({
-						embeds: [successEmbed],
-						components: [],
-					});
-
-					// Send application to new-applications channel for moderators
-					const newApplicationsChannel = guild.channels.cache.find(
-						(channel) =>
-							channel.name === 'new-applications' &&
-							channel.type === ChannelType.GuildText,
-					);
-
-					if (newApplicationsChannel) {
-						const applicationEmbed = new EmbedBuilder()
-							.setTitle('📋 New Application')
-							.setDescription(
-								`**Applicant:** ${member.user.tag} (${member.user.id})`,
-							)
-							.setColor(0x5865f2)
-							.addFields(
-								{ name: 'Username', value: appData.username, inline: true },
-								{ name: 'Age', value: appData.age, inline: true },
-								{ name: 'Recruiter', value: appData.recruiter, inline: true },
-								{ name: 'Why join?', value: appData.reason },
-								{ name: 'Games', value: selectedGames.join(', ') },
-							)
-							.setThumbnail(member.user.displayAvatarURL())
-							.setFooter({ text: `User ID: ${member.user.id}` })
-							.setTimestamp();
-
-						// Create Accept and Deny buttons
-						const acceptButton = new ButtonBuilder()
-							.setCustomId(`accept_application_${member.user.id}`)
-							.setLabel('Accept')
-							.setStyle(ButtonStyle.Success)
-							.setEmoji('✅');
-
-						const denyButton = new ButtonBuilder()
-							.setCustomId(`deny_application_${member.user.id}`)
-							.setLabel('Deny')
-							.setStyle(ButtonStyle.Danger)
-							.setEmoji('❌');
-
-						const buttonRow = new ActionRowBuilder().addComponents(
-							acceptButton,
-							denyButton,
-						);
-
-						// Store the application data for later use when buttons are clicked
-						if (!interaction.client.applicationData) {
-							interaction.client.applicationData = new Map();
-						}
-
-						interaction.client.applicationData.set(member.user.id, {
-							username: appData.username,
-							age: appData.age,
-							recruiter: appData.recruiter,
-							reason: appData.reason,
-							games: selectedGames,
-						});
-
-						await newApplicationsChannel.send({
-							embeds: [applicationEmbed],
-							components: [buttonRow],
-						});
-					}
-					else {
-						console.error('new-applications channel not found!');
-					}
-
-					// Clean up the pending application data
-					interaction.client.pendingApplications.delete(interaction.user.id);
-
-					console.log(
-						`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Games: ${selectedGames.join(', ')}`,
-					);
-				}
-				catch (error) {
-					console.error('Error processing application:', error);
-					await interaction.reply({
-						content:
-							'There was an error processing your application. Please try again later.',
-						flags: MessageFlags.Ephemeral,
-					});
-					// Clean up on error
-					if (interaction.client.pendingApplications) {
-						interaction.client.pendingApplications.delete(interaction.user.id);
-					}
-				}
+				const appData = interaction.client.pendingApplications.get(
+					interaction.user.id,
+				);
+				// Array of selected other games
+				const otherGames = interaction.values;
+				
+				// Complete the application submission
+				await completeApplicationSubmission(interaction, appData, otherGames);
 			}
 		}
 	},
 };
+
+// Helper function to complete application submission
+async function completeApplicationSubmission(interaction, appData, otherGames) {
+	const mainGame = appData.mainGame;
+
+	// Get the guild
+	const guild = interaction.client.guilds.cache.first();
+
+	if (!guild) {
+		await interaction.reply({
+			content: 'Unable to find the server. Please try again later.',
+			flags: MessageFlags.Ephemeral,
+		});
+		return;
+	}
+
+	try {
+		// Fetch the member from the guild
+		const member = await guild.members.fetch(interaction.user.id);
+
+		if (!member) {
+			await interaction.reply({
+				content:
+					'Unable to find you in the server. Please try again later.',
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+
+		// Try to find the "Applicant" role
+		const applicantRole = guild.roles.cache.find(
+			(role) => role.name === 'Applicant',
+		);
+
+		if (!applicantRole) {
+			console.error('Applicant role not found!');
+
+			// Send error message to default text channel
+			const defaultChannel =
+				guild.systemChannel ||
+				guild.channels.cache.find(
+					(channel) =>
+						channel.type === ChannelType.GuildText &&
+						channel.permissionsFor(guild.members.me).has('SendMessages'),
+				);
+
+			if (defaultChannel) {
+				const errorEmbed = new EmbedBuilder()
+					.setTitle('⚠️ Configuration Error')
+					.setDescription(
+						'The "Applicant" role does not exist. Please create a role named "Applicant" for the application system to work properly.',
+					)
+					.setColor(0xff0000)
+					.setTimestamp();
+
+				await defaultChannel.send({ embeds: [errorEmbed] });
+			}
+
+			await interaction.reply({
+				content:
+					'There was an error processing your application. The Applicant role is not configured. Please contact a server administrator.',
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+
+		// Add the Applicant role to the user
+		let roleAdded = true;
+		try {
+			await member.roles.add(applicantRole);
+		}
+		catch (roleError) {
+			roleAdded = false;
+			console.error('Error adding Applicant role:', roleError.message);
+		}
+
+		// Change the user's nickname to their username
+		let nicknameChanged = true;
+		let nicknameErrorReason = '';
+		try {
+			// Check if we can actually change the nickname before attempting
+			if (member.id === guild.ownerId) {
+				nicknameChanged = false;
+				nicknameErrorReason = 'You are the server owner';
+			}
+			else if (!guild.members.me.permissions.has('ManageNicknames')) {
+				nicknameChanged = false;
+				nicknameErrorReason = 'Bot lacks Manage Nicknames permission';
+			}
+			else if (
+				member.roles.highest.position >=
+				guild.members.me.roles.highest.position
+			) {
+				nicknameChanged = false;
+				nicknameErrorReason =
+					'Your role is higher than or equal to the bot\'s role';
+			}
+			else {
+				await member.setNickname(appData.username);
+			}
+		}
+		catch (nickError) {
+			nicknameChanged = false;
+			nicknameErrorReason = nickError.message;
+			console.error('Error setting nickname:', nickError.message);
+		}
+
+		// Send success message
+		let descriptionText =
+			'Your application has been submitted for review!';
+
+		// Add warnings if something didn't work
+		if (!roleAdded) {
+			descriptionText +=
+				'\n\n⚠️ **Error:** Could not add the Applicant role. Please contact an administrator.';
+		}
+		if (!nicknameChanged) {
+			descriptionText += `\n\n⚠️ **Note:** Could not change your nickname automatically (${nicknameErrorReason}). Please contact a moderator if you want your nickname changed.`;
+		}
+
+		// Build game fields text
+		const mainGameText = mainGame;
+		const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
+
+		const successEmbed = new EmbedBuilder()
+			.setTitle(
+				roleAdded
+					? '✅ Application Submitted!'
+					: '⚠️ Application Submitted (with issues)',
+			)
+			.setDescription(descriptionText)
+			.setColor(roleAdded && nicknameChanged ? 0x00ff00 : 0xffa500)
+			.addFields(
+				{ name: 'Username', value: appData.username, inline: true },
+				{ name: 'Age', value: appData.age, inline: true },
+				{ name: 'Recruiter', value: appData.recruiter, inline: true },
+				{ name: 'Why join?', value: appData.reason },
+				{ name: 'Main Game', value: mainGameText, inline: true },
+				{ name: 'Other Games', value: otherGamesText, inline: true },
+			)
+			.setFooter({
+				text: 'Your application is pending moderator review!',
+			})
+			.setTimestamp();
+
+		await interaction.update({
+			embeds: [successEmbed],
+			components: [],
+		});
+
+		// Send application to new-applications channel for moderators
+		const newApplicationsChannel = guild.channels.cache.find(
+			(channel) =>
+				channel.name === 'new-applications' &&
+				channel.type === ChannelType.GuildText,
+		);
+
+		if (newApplicationsChannel) {
+			const applicationEmbed = new EmbedBuilder()
+				.setTitle('📋 New Application')
+				.setDescription(
+					`**Applicant:** ${member.user.tag} (${member.user.id})`,
+				)
+				.setColor(0x5865f2)
+				.addFields(
+					{ name: 'Username', value: appData.username, inline: true },
+					{ name: 'Age', value: appData.age, inline: true },
+					{ name: 'Recruiter', value: appData.recruiter, inline: true },
+					{ name: 'Why join?', value: appData.reason },
+					{ name: 'Main Game', value: mainGameText, inline: true },
+					{ name: 'Other Games (Level 5+)', value: otherGamesText, inline: true },
+				)
+				.setThumbnail(member.user.displayAvatarURL())
+				.setFooter({ text: `User ID: ${member.user.id}` })
+				.setTimestamp();
+
+			// Create Accept and Deny buttons
+			const acceptButton = new ButtonBuilder()
+				.setCustomId(`accept_application_${member.user.id}`)
+				.setLabel('Accept')
+				.setStyle(ButtonStyle.Success)
+				.setEmoji('✅');
+
+			const denyButton = new ButtonBuilder()
+				.setCustomId(`deny_application_${member.user.id}`)
+				.setLabel('Deny')
+				.setStyle(ButtonStyle.Danger)
+				.setEmoji('❌');
+
+			const buttonRow = new ActionRowBuilder().addComponents(
+				acceptButton,
+				denyButton,
+			);
+
+			// Store the application data for later use when buttons are clicked
+			if (!interaction.client.applicationData) {
+				interaction.client.applicationData = new Map();
+			}
+
+			interaction.client.applicationData.set(member.user.id, {
+				username: appData.username,
+				age: appData.age,
+				recruiter: appData.recruiter,
+				reason: appData.reason,
+				mainGame: mainGame,
+				otherGames: otherGames,
+			});
+
+			await newApplicationsChannel.send({
+				embeds: [applicationEmbed],
+				components: [buttonRow],
+			});
+		}
+		else {
+			console.error('new-applications channel not found!');
+		}
+
+		// Clean up the pending application data
+		interaction.client.pendingApplications.delete(interaction.user.id);
+
+		console.log(
+			`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Main Game: ${mainGame}, Other Games: ${otherGames.join(', ')}`,
+		);
+	}
+	catch (error) {
+		console.error('Error processing application:', error);
+		await interaction.reply({
+			content:
+				'There was an error processing your application. Please try again later.',
+			flags: MessageFlags.Ephemeral,
+		});
+		// Clean up on error
+		if (interaction.client.pendingApplications) {
+			interaction.client.pendingApplications.delete(interaction.user.id);
+		}
+	}
+}
