@@ -202,61 +202,24 @@ module.exports = {
 						}
 					}
 					else {
-						// Deny application - kick user
-						try {
-							await member.kick('Application denied');
+						// Deny application - show modal to get rejection reason
+						const rejectModal = new ModalBuilder()
+							.setCustomId(`reject_reason_modal_${userId}`)
+							.setTitle('Application Rejection Reason');
 
-							// Update the message
-							const originalEmbed = interaction.message.embeds[0];
-							const deniedEmbed = EmbedBuilder.from(originalEmbed)
-								.setColor(0xff0000)
-								.setTitle('❌ Application Denied')
-								.addFields({
-									name: 'Processed By',
-									value: `${interaction.user.tag}`,
-									inline: true,
-								});
+						const reasonInput = new TextInputBuilder()
+							.setCustomId('reject_reason_input')
+							.setLabel('Reason for rejection')
+							.setStyle(TextInputStyle.Paragraph)
+							.setMinLength(10)
+							.setMaxLength(500)
+							.setPlaceholder('Enter the reason for rejecting this application...')
+							.setRequired(true);
 
-							await interaction.update({
-								embeds: [deniedEmbed],
-								components: [],
-							});
+						const reasonRow = new ActionRowBuilder().addComponents(reasonInput);
+						rejectModal.addComponents(reasonRow);
 
-							// Clean up application data
-							if (interaction.client.applicationData) {
-								interaction.client.applicationData.delete(userId);
-							}
-						}
-						catch (kickError) {
-							console.error('Error kicking user:', kickError);
-
-							// Update message to show kick failed
-							const originalEmbed = interaction.message.embeds[0];
-							const deniedEmbed = EmbedBuilder.from(originalEmbed)
-								.setColor(0xff0000)
-								.setTitle('❌ Application Denied (Kick Failed)')
-								.addFields(
-									{
-										name: 'Processed By',
-										value: `${interaction.user.tag}`,
-										inline: true,
-									},
-									{
-										name: '⚠️ Error',
-										value: `Could not kick user: ${kickError.message}`,
-									},
-								);
-
-							await interaction.update({
-								embeds: [deniedEmbed],
-								components: [],
-							});
-
-							await interaction.followUp({
-								content: `⚠️ Could not kick user: ${kickError.message}`,
-								flags: MessageFlags.Ephemeral,
-							});
-						}
+						await interaction.showModal(rejectModal);
 					}
 				}
 				catch (error) {
@@ -293,15 +256,6 @@ module.exports = {
 					.setPlaceholder('Enter your age...')
 					.setRequired(true);
 
-				const recruiterInput = new TextInputBuilder()
-					.setCustomId('recruiter_input')
-					.setLabel('Recruiter Discord Tag')
-					.setStyle(TextInputStyle.Short)
-					.setMinLength(2)
-					.setMaxLength(37)
-					.setPlaceholder('Enter your recruiter\'s Discord tag...')
-					.setRequired(true);
-
 				const reasonInput = new TextInputBuilder()
 					.setCustomId('reason_input')
 					.setLabel('Why do you want to join Andromeda Gaming?')
@@ -314,11 +268,10 @@ module.exports = {
 				// Add inputs to action rows
 				const row1 = new ActionRowBuilder().addComponents(usernameInput);
 				const row2 = new ActionRowBuilder().addComponents(ageInput);
-				const row3 = new ActionRowBuilder().addComponents(recruiterInput);
-				const row4 = new ActionRowBuilder().addComponents(reasonInput);
+				const row3 = new ActionRowBuilder().addComponents(reasonInput);
 
 				// Add all action rows to the modal
-				modal.addComponents(row1, row2, row3, row4);
+				modal.addComponents(row1, row2, row3);
 
 				// Show the modal
 				await interaction.showModal(modal);
@@ -354,9 +307,6 @@ module.exports = {
 					.getTextInputValue('username_input')
 					.trim();
 				const age = interaction.fields.getTextInputValue('age_input').trim();
-				const recruiter = interaction.fields
-					.getTextInputValue('recruiter_input')
-					.trim();
 				const reason = interaction.fields
 					.getTextInputValue('reason_input')
 					.trim();
@@ -401,7 +351,6 @@ module.exports = {
 				interaction.client.pendingApplications.set(interaction.user.id, {
 					username,
 					age,
-					recruiter,
 					reason,
 				});
 
@@ -420,6 +369,90 @@ module.exports = {
 					components: [selectRow],
 					flags: MessageFlags.Ephemeral,
 				});
+			}
+			// Handle reject reason modal submission
+			else if (interaction.customId.startsWith('reject_reason_modal_')) {
+				const userId = interaction.customId.split('_').pop();
+				const rejectReason = interaction.fields
+					.getTextInputValue('reject_reason_input')
+					.trim();
+
+				const guild = interaction.client.guilds.cache.first();
+
+				if (!guild) {
+					await interaction.reply({
+						content: 'Unable to find the server.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				try {
+					const member = await guild.members.fetch(userId);
+
+					if (!member) {
+						await interaction.reply({
+							content: 'Unable to find this user in the server. They may have left.',
+							flags: MessageFlags.Ephemeral,
+						});
+						return;
+					}
+
+					// Send DM to the user with rejection reason
+					try {
+						const dmEmbed = new EmbedBuilder()
+							.setTitle('❌ Application Declined')
+							.setDescription(
+								'Your application to Andromeda Gaming has been declined.\n\n' +
+								'**Reason:**\n```\n' + rejectReason + '\n```'
+							)
+							.setColor(0xff0000)
+							.setTimestamp();
+
+						await member.send({ embeds: [dmEmbed] });
+					}
+					catch (dmError) {
+						console.log(`Could not DM user ${member.user.tag}`);
+						await interaction.reply({
+							content: `⚠️ Application rejected, but could not send DM to user (they may have DMs disabled).`,
+							flags: MessageFlags.Ephemeral,
+						});
+					}
+
+					// Update the message in the new-applications channel
+					const originalEmbed = interaction.message.embeds[0];
+					const deniedEmbed = EmbedBuilder.from(originalEmbed)
+						.setColor(0xff0000)
+						.setTitle('❌ Application Denied')
+						.addFields(
+							{
+								name: 'Processed By',
+								value: `${interaction.user.tag}`,
+								inline: true,
+							},
+							{
+								name: 'Rejection Reason',
+								value: '```\n' + rejectReason + '\n```',
+							}
+						);
+
+					await interaction.update({
+						embeds: [deniedEmbed],
+						components: [],
+					});
+
+					// Clean up application data
+					if (interaction.client.applicationData) {
+						interaction.client.applicationData.delete(userId);
+					}
+				}
+				catch (error) {
+					console.error('Error processing rejection:', error);
+					await interaction.reply({
+						content: `Error processing rejection: ${error.message}`,
+						flags: MessageFlags.Ephemeral,
+					});
+				}
 			}
 		}
 		// Handle select menu interactions
@@ -657,18 +690,68 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		const mainGameText = mainGame;
 		const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
 
+		// Create a thread in the 'application' channel
+		let threadLink = null;
+		const applicationChannel = guild.channels.cache.find(
+			(channel) =>
+				channel.name === 'application' &&
+				channel.type === ChannelType.GuildText,
+		);
+
+		if (applicationChannel) {
+			try {
+				const currentDate = new Date().toLocaleDateString('en-US', {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+				});
+				const threadName = `${appData.username}'s application - ${currentDate}`;
+
+				// Create thread
+				const thread = await applicationChannel.threads.create({
+					name: threadName,
+					autoArchiveDuration: 60, // Archive after 60 minutes of inactivity
+					reason: `Application thread for ${member.user.tag}`,
+				});
+
+				// Send initial message to thread
+				const threadEmbed = new EmbedBuilder()
+					.setTitle(`${appData.username}'s Application`)
+					.setDescription(`Application submitted by ${member.user.tag}`)
+					.setColor(0x5865f2)
+					.addFields(
+						{ name: 'Username', value: appData.username, inline: true },
+						{ name: 'Age', value: appData.age, inline: true },
+						{ name: 'Why join?', value: appData.reason },
+						{ name: 'Main Game', value: mainGameText, inline: true },
+						{ name: 'Other Games', value: otherGamesText, inline: true },
+					)
+					.setThumbnail(member.user.displayAvatarURL())
+					.setTimestamp();
+
+				await thread.send({ embeds: [threadEmbed] });
+
+				threadLink = thread.url;
+			}
+			catch (threadError) {
+				console.error('Error creating application thread:', threadError);
+			}
+		}
+		else {
+			console.error('application channel not found!');
+		}
+
 		const successEmbed = new EmbedBuilder()
 			.setTitle(
 				roleAdded
 					? '✅ Application Submitted!'
 					: '⚠️ Application Submitted (with issues)',
 			)
-			.setDescription(descriptionText)
+			.setDescription(descriptionText + (threadLink ? `\n\n**[View Your Application Thread](${threadLink})**` : ''))
 			.setColor(roleAdded && nicknameChanged ? 0x00ff00 : 0xffa500)
 			.addFields(
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
-				{ name: 'Recruiter', value: appData.recruiter, inline: true },
 				{ name: 'Why join?', value: appData.reason },
 				{ name: 'Main Game', value: mainGameText, inline: true },
 				{ name: 'Other Games', value: otherGamesText, inline: true },
@@ -700,7 +783,6 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				.addFields(
 					{ name: 'Username', value: appData.username, inline: true },
 					{ name: 'Age', value: appData.age, inline: true },
-					{ name: 'Recruiter', value: appData.recruiter, inline: true },
 					{ name: 'Why join?', value: appData.reason },
 					{ name: 'Main Game', value: mainGameText, inline: true },
 					{ name: 'Other Games (Level 5+)', value: otherGamesText, inline: true },
@@ -735,7 +817,6 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			interaction.client.applicationData.set(member.user.id, {
 				username: appData.username,
 				age: appData.age,
-				recruiter: appData.recruiter,
 				reason: appData.reason,
 				mainGame: mainGame,
 				otherGames: otherGames,
