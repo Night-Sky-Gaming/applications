@@ -146,52 +146,70 @@ module.exports = {
 									inline: true,
 								});
 
-							if (mainGameRoleAdded) {
-								acceptedEmbed.addFields({
-									name: 'Main Game Role Added',
-									value: appData.mainGame,
-								});
-							}
+						if (mainGameRoleAdded) {
+							acceptedEmbed.addFields({
+								name: 'Main Game Type Role Added',
+								value: appData.mainGame,
+							});
+						}
 
-							if (mainGameRoleMissing) {
-								acceptedEmbed.addFields({
-									name: '⚠️ Main Game Role Missing',
-									value: appData.mainGame || 'Unknown',
-								});
-							}
+						if (mainGameRoleMissing) {
+							acceptedEmbed.addFields({
+								name: '⚠️ Main Game Type Role Missing',
+								value: appData.mainGame || 'Unknown',
+							});
+						}
 
-							if (appData && appData.otherGames && appData.otherGames.length > 0) {
-								acceptedEmbed.addFields({
-									name: 'ℹ️ Other Games (Level 5+ Access)',
-									value: appData.otherGames.join(', '),
-								});
-							}
-
-							await interaction.update({
+						if (appData && appData.otherGames && appData.otherGames.length > 0) {
+							acceptedEmbed.addFields({
+								name: 'ℹ️ Other Game Types (Level 5+ Access)',
+								value: appData.otherGames.join(', '),
+							});
+						}							await interaction.update({
 								embeds: [acceptedEmbed],
 								components: [],
 							});
 
-							// Notify the user
+						// Notify the user
+						try {
+							const dmEmbed = new EmbedBuilder()
+								.setTitle('✅ Application Accepted!')
+								.setDescription(
+									'Your application to Andromeda Gaming has been accepted!',
+								)
+								.setColor(0x00ff00)
+								.setTimestamp();
+
+							await member.send({ embeds: [dmEmbed] });
+						}
+						catch {
+							console.log(`Could not DM user ${member.user.tag}`);
+						}
+
+						// Close the application thread
+						if (appData && appData.threadId) {
 							try {
-								const dmEmbed = new EmbedBuilder()
-									.setTitle('✅ Application Accepted!')
-									.setDescription(
-										'Your application to Andromeda Gaming has been accepted!',
-									)
-									.setColor(0x00ff00)
-									.setTimestamp();
+								const applicationChannel = guild.channels.cache.find(
+									(channel) =>
+										channel.name === 'application' &&
+										channel.type === ChannelType.GuildText,
+								);
+								if (applicationChannel) {
+									const thread = await applicationChannel.threads.fetch(appData.threadId);
+									if (thread) {
+										await thread.setLocked(true);
+										await thread.setArchived(true);
+									}
+								}
+							} catch (threadError) {
+								console.error('Error closing application thread:', threadError);
+							}
+						}
 
-								await member.send({ embeds: [dmEmbed] });
-							}
-							catch {
-								console.log(`Could not DM user ${member.user.tag}`);
-							}
-
-							// Clean up application data
-							if (interaction.client.applicationData) {
-								interaction.client.applicationData.delete(userId);
-							}
+						// Clean up application data
+						if (interaction.client.applicationData) {
+							interaction.client.applicationData.delete(userId);
+						}
 						}
 						catch (error) {
 							console.error('Error accepting application:', error);
@@ -311,36 +329,35 @@ module.exports = {
 					.getTextInputValue('reason_input')
 					.trim();
 
-				// Create a select menu for main game (single selection)
-				const mainGameSelect = new StringSelectMenuBuilder()
-					.setCustomId(`main_game_select_${interaction.user.id}`)
-					.setPlaceholder('Select your MAIN game')
-					.setMinValues(1)
-					.setMaxValues(1)
-					.addOptions(
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Fortnite')
-							.setValue('Fortnite'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('R6 Siege X')
-							.setValue('R6 Siege X'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Overwatch')
-							.setValue('Overwatch'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Magic the Gathering')
-							.setValue('Magic the Gathering'),
-						new StringSelectMenuOptionBuilder().setLabel('BR').setValue('BR'),
-						new StringSelectMenuOptionBuilder().setLabel('FPS').setValue('FPS'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Tabletop')
-							.setValue('Tabletop'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('MOBA')
-							.setValue('MOBA'),
-					);
-
-				const selectRow = new ActionRowBuilder().addComponents(mainGameSelect);
+			// Create a select menu for main game type (single selection)
+			const mainGameSelect = new StringSelectMenuBuilder()
+				.setCustomId(`main_game_select_${interaction.user.id}`)
+				.setPlaceholder('Select your MAIN game type')
+				.setMinValues(1)
+				.setMaxValues(1)
+				.addOptions(
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Battle Royale')
+						.setValue('Battle Royale'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('FPS')
+						.setValue('FPS'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('3rd PS')
+						.setValue('3rd PS'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Social')
+						.setValue('Social'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Open World')
+						.setValue('Open World'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('MOBA')
+						.setValue('MOBA'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Sports')
+						.setValue('Sports'),
+				);				const selectRow = new ActionRowBuilder().addComponents(mainGameSelect);
 
 				// Store the application data temporarily (we'll use this when they select games)
 				// We'll store it in the client's temporary storage
@@ -354,13 +371,13 @@ module.exports = {
 					reason,
 				});
 
-				// Send the main game selection menu
-				const selectEmbed = new EmbedBuilder()
-					.setTitle('📝 Select Your Main Game')
-					.setDescription(
-						'Please select your **MAIN game** from the dropdown menu below.\n\n' +
-						'You will receive the role for this game upon acceptance.',
-					)
+			// Send the main game type selection menu
+			const selectEmbed = new EmbedBuilder()
+				.setTitle('📝 Select Your Main Game Type')
+				.setDescription(
+					'Please select your **MAIN game type** from the dropdown menu below.\n\n' +
+					'You will receive the role for this game type upon acceptance.',
+				)
 					.setColor(0x5865f2)
 					.setTimestamp();
 
@@ -441,6 +458,27 @@ module.exports = {
 						components: [],
 					});
 
+					// Close the application thread
+					const appData = interaction.client.applicationData?.get(userId);
+					if (appData && appData.threadId) {
+						try {
+						const applicationChannel = guild.channels.cache.find(
+							(channel) =>
+								channel.name === 'application' &&
+								channel.type === ChannelType.GuildText,
+						);
+						if (applicationChannel) {
+							const thread = await applicationChannel.threads.fetch(appData.threadId);
+							if (thread) {
+								await thread.setLocked(true);
+								await thread.setArchived(true);
+							}
+						}
+					} catch (threadError) {
+						console.error('Error closing application thread:', threadError);
+						}
+					}
+
 					// Clean up application data
 					if (interaction.client.applicationData) {
 						interaction.client.applicationData.delete(userId);
@@ -483,54 +521,51 @@ module.exports = {
 				appData.mainGame = mainGame;
 				interaction.client.pendingApplications.set(interaction.user.id, appData);
 
-				// Create a select menu for other games (multiple selection)
-				const otherGamesSelect = new StringSelectMenuBuilder()
-					.setCustomId(`other_games_select_${interaction.user.id}`)
-					.setPlaceholder('Select other games you play (optional)')
-					.setMinValues(0)
-					.setMaxValues(7) // Max 7 since they already selected 1 as main
-					.addOptions(
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Fortnite')
-							.setValue('Fortnite'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('R6 Siege X')
-							.setValue('R6 Siege X'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Overwatch')
-							.setValue('Overwatch'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Magic the Gathering')
-							.setValue('Magic the Gathering'),
-						new StringSelectMenuOptionBuilder().setLabel('BR').setValue('BR'),
-						new StringSelectMenuOptionBuilder().setLabel('FPS').setValue('FPS'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('Tabletop')
-							.setValue('Tabletop'),
-						new StringSelectMenuOptionBuilder()
-							.setLabel('MOBA')
-							.setValue('MOBA'),
-					);
+			// Create a select menu for other game types (multiple selection)
+			const otherGamesSelect = new StringSelectMenuBuilder()
+				.setCustomId(`other_games_select_${interaction.user.id}`)
+				.setPlaceholder('Select other game types you play (optional)')
+				.setMinValues(0)
+				.setMaxValues(6) // Max 6 since they already selected 1 as main
+				.addOptions(
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Battle Royale')
+						.setValue('Battle Royale'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('FPS')
+						.setValue('FPS'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('3rd PS')
+						.setValue('3rd PS'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Social')
+						.setValue('Social'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Open World')
+						.setValue('Open World'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('MOBA')
+						.setValue('MOBA'),
+					new StringSelectMenuOptionBuilder()
+						.setLabel('Sports')
+						.setValue('Sports'),
+				);				const selectRow = new ActionRowBuilder().addComponents(otherGamesSelect);
 
-				const selectRow = new ActionRowBuilder().addComponents(otherGamesSelect);
+			// Add a skip button for users who only play their main game type
+			const skipButton = new ButtonBuilder()
+				.setCustomId(`skip_other_games_${interaction.user.id}`)
+				.setLabel('Skip - I only play my main game type')
+				.setStyle(ButtonStyle.Secondary);				const buttonRow = new ActionRowBuilder().addComponents(skipButton);
 
-				// Add a skip button for users who only play their main game
-				const skipButton = new ButtonBuilder()
-					.setCustomId(`skip_other_games_${interaction.user.id}`)
-					.setLabel('Skip - I only play my main game')
-					.setStyle(ButtonStyle.Secondary);
-
-				const buttonRow = new ActionRowBuilder().addComponents(skipButton);
-
-				// Send the other games selection menu
-				const selectEmbed = new EmbedBuilder()
-					.setTitle('📝 Select Other Games (Optional)')
-					.setDescription(
-						`**Your Main Game:** ${mainGame}\n\n` +
-						'Select any **other games** you play from the dropdown menu below.\n\n' +
-						'⚠️ **Note:** You will get access to these game channels once you reach **Level 5**.\n\n' +
-						'If you only play your main game, click the "Skip" button.',
-					)
+			// Send the other game types selection menu
+			const selectEmbed = new EmbedBuilder()
+				.setTitle('📝 Select Other Game Types (Optional)')
+				.setDescription(
+					`**Your Main Game Type:** ${mainGame}\n\n` +
+					'Select any **other game types** you play from the dropdown menu below.\n\n' +
+					'⚠️ **Note:** You will get access to these game type channels once you reach **Level 5**.\n\n' +
+					'If you only play your main game type, click the "Skip" button.',
+				)
 					.setColor(0x5865f2)
 					.setTimestamp();
 
@@ -571,11 +606,14 @@ module.exports = {
 async function completeApplicationSubmission(interaction, appData, otherGames) {
 	const mainGame = appData.mainGame;
 
+	// Defer the interaction immediately to prevent timeout
+	await interaction.deferUpdate();
+
 	// Get the guild
 	const guild = interaction.client.guilds.cache.first();
 
 	if (!guild) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: 'Unable to find the server. Please try again later.',
 			flags: MessageFlags.Ephemeral,
 		});
@@ -587,7 +625,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		const member = await guild.members.fetch(interaction.user.id);
 
 		if (!member) {
-			await interaction.reply({
+			await interaction.followUp({
 				content:
 					'Unable to find you in the server. Please try again later.',
 				flags: MessageFlags.Ephemeral,
@@ -624,7 +662,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				await defaultChannel.send({ embeds: [errorEmbed] });
 			}
 
-			await interaction.reply({
+			await interaction.followUp({
 				content:
 					'There was an error processing your application. The Applicant role is not configured. Please contact a server administrator.',
 				flags: MessageFlags.Ephemeral,
@@ -692,6 +730,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 
 		// Create a thread in the 'application' channel
 		let threadLink = null;
+		let threadId = null;
 		const applicationChannel = guild.channels.cache.find(
 			(channel) =>
 				channel.name === 'application' &&
@@ -723,15 +762,29 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 						{ name: 'Username', value: appData.username, inline: true },
 						{ name: 'Age', value: appData.age, inline: true },
 						{ name: 'Why join?', value: appData.reason },
-						{ name: 'Main Game', value: mainGameText, inline: true },
-						{ name: 'Other Games', value: otherGamesText, inline: true },
+						{ name: 'Main Game Type', value: mainGameText, inline: true },
+						{ name: 'Other Game Types', value: otherGamesText, inline: true },
 					)
 					.setThumbnail(member.user.displayAvatarURL())
 					.setTimestamp();
 
 				await thread.send({ embeds: [threadEmbed] });
 
+				// Tag the role and the applicant user
+				await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
+
 				threadLink = thread.url;
+				threadId = thread.id;
+
+				// Delete the automatic system message from the application channel
+				try {
+					const starterMessage = await applicationChannel.messages.fetch(thread.id);
+					if (starterMessage) {
+						await starterMessage.delete();
+					}
+				} catch (deleteError) {
+					console.error('Error deleting thread starter message:', deleteError);
+				}
 			}
 			catch (threadError) {
 				console.error('Error creating application thread:', threadError);
@@ -753,15 +806,15 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
 				{ name: 'Why join?', value: appData.reason },
-				{ name: 'Main Game', value: mainGameText, inline: true },
-				{ name: 'Other Games', value: otherGamesText, inline: true },
+				{ name: 'Main Game Type', value: mainGameText, inline: true },
+				{ name: 'Other Game Types', value: otherGamesText, inline: true },
 			)
 			.setFooter({
 				text: 'Your application is pending moderator review!',
 			})
 			.setTimestamp();
 
-		await interaction.update({
+		await interaction.editReply({
 			embeds: [successEmbed],
 			components: [],
 		});
@@ -784,8 +837,8 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 					{ name: 'Username', value: appData.username, inline: true },
 					{ name: 'Age', value: appData.age, inline: true },
 					{ name: 'Why join?', value: appData.reason },
-					{ name: 'Main Game', value: mainGameText, inline: true },
-					{ name: 'Other Games (Level 5+)', value: otherGamesText, inline: true },
+					{ name: 'Main Game Type', value: mainGameText, inline: true },
+					{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
 				)
 				.setThumbnail(member.user.displayAvatarURL())
 				.setFooter({ text: `User ID: ${member.user.id}` })
@@ -814,18 +867,24 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				interaction.client.applicationData = new Map();
 			}
 
-			interaction.client.applicationData.set(member.user.id, {
-				username: appData.username,
-				age: appData.age,
-				reason: appData.reason,
-				mainGame: mainGame,
-				otherGames: otherGames,
-			});
-
-			await newApplicationsChannel.send({
+		interaction.client.applicationData.set(member.user.id, {
+			username: appData.username,
+			age: appData.age,
+			reason: appData.reason,
+			mainGame: mainGame,
+			otherGames: otherGames,
+			threadId: threadId,
+		});			await newApplicationsChannel.send({
 				embeds: [applicationEmbed],
 				components: [buttonRow],
 			});
+
+			// Send thread link message to new-applications channel
+			if (threadLink) {
+				await newApplicationsChannel.send({
+					content: threadLink,
+				});
+			}
 		}
 		else {
 			console.error('new-applications channel not found!');
@@ -840,7 +899,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 	}
 	catch (error) {
 		console.error('Error processing application:', error);
-		await interaction.reply({
+		await interaction.followUp({
 			content:
 				'There was an error processing your application. Please try again later.',
 			flags: MessageFlags.Ephemeral,
