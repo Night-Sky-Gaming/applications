@@ -109,33 +109,38 @@ module.exports = {
 								await member.roles.remove(applicantRole);
 							}
 
-							// Add ONLY the main game role (not other games)
-							let mainGameRoleAdded = false;
-							let mainGameRoleMissing = false;
+						// Add ONLY the main game role (not other games)
+						let mainGameRoleAdded = false;
+						let mainGameRoleMissing = false;
 
-							if (appData && appData.mainGame) {
-								const mainGameRole = guild.roles.cache.find(
-									(role) => role.name === appData.mainGame,
-								);
-								if (mainGameRole) {
-									try {
-										await member.roles.add(mainGameRole);
-										mainGameRoleAdded = true;
-									}
-									catch (roleError) {
-										console.error(
-											`Error adding main game role ${appData.mainGame}:`,
-											roleError.message,
-										);
-										mainGameRoleMissing = true;
-									}
+						if (appData && appData.mainGame) {
+							console.log(`Looking for main game role: "${appData.mainGame}"`);
+							console.log('Available roles:', guild.roles.cache.map(r => `"${r.name}"`).join(', '));
+							
+							const mainGameRole = guild.roles.cache.find(
+								(role) => role.name === appData.mainGame,
+							);
+							
+							if (mainGameRole) {
+								console.log(`Found role: ${mainGameRole.name} (ID: ${mainGameRole.id})`);
+								try {
+									await member.roles.add(mainGameRole);
+									mainGameRoleAdded = true;
+									console.log(`Successfully added role ${mainGameRole.name} to ${member.user.tag}`);
 								}
-								else {
+								catch (roleError) {
+									console.error(
+										`Error adding main game role ${appData.mainGame}:`,
+										roleError.message,
+									);
 									mainGameRoleMissing = true;
 								}
 							}
-
-							// Update the message
+							else {
+								console.log(`Role "${appData.mainGame}" not found in server`);
+								mainGameRoleMissing = true;
+							}
+						}							// Update the message
 							const originalEmbed = interaction.message.embeds[0];
 							const acceptedEmbed = EmbedBuilder.from(originalEmbed)
 								.setColor(0x00ff00)
