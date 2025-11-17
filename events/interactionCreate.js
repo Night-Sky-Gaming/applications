@@ -57,7 +57,7 @@ module.exports = {
 				const userId = interaction.customId.split('_').pop();
 				const isAccept = interaction.customId.startsWith('accept_application_');
 
-				const guild = interaction.client.guilds.cache.first();
+				const guild = interaction.guild;
 
 				if (!guild) {
 					await interaction.reply({
@@ -394,7 +394,7 @@ module.exports = {
 					.getTextInputValue('reject_reason_input')
 					.trim();
 
-				const guild = interaction.client.guilds.cache.first();
+				const guild = interaction.guild;
 
 				if (!guild) {
 					await interaction.reply({
@@ -416,6 +416,7 @@ module.exports = {
 					}
 
 					// Send DM to the user with rejection reason
+					let dmSent = true;
 					try {
 						const dmEmbed = new EmbedBuilder()
 							.setTitle('❌ Application Declined')
@@ -429,11 +430,8 @@ module.exports = {
 						await member.send({ embeds: [dmEmbed] });
 					}
 					catch (dmError) {
+						dmSent = false;
 						console.log(`Could not DM user ${member.user.tag}`);
-						await interaction.reply({
-							content: `⚠️ Application rejected, but could not send DM to user (they may have DMs disabled).`,
-							flags: MessageFlags.Ephemeral,
-						});
 					}
 
 					// Update the message in the new-applications channel
@@ -452,6 +450,13 @@ module.exports = {
 								value: '```\n' + rejectReason + '\n```',
 							}
 						);
+
+					if (!dmSent) {
+						deniedEmbed.addFields({
+							name: '⚠️ DM Status',
+							value: 'Could not send DM to user (DMs may be disabled)',
+						});
+					}
 
 					await interaction.update({
 						embeds: [deniedEmbed],
@@ -606,7 +611,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 	await interaction.deferUpdate();
 
 	// Get the guild
-	const guild = interaction.client.guilds.cache.first();
+	const guild = interaction.guild;
 
 	if (!guild) {
 		await interaction.followUp({
