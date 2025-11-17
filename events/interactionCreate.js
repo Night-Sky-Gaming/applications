@@ -745,6 +745,9 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 					reason: `Application thread for ${member.user.tag}`,
 				});
 
+				// Add the applicant to the thread so they can participate
+				await thread.members.add(member.user.id);
+
 				// Send initial message to thread
 				const threadEmbed = new EmbedBuilder()
 					.setTitle(`${appData.username}'s Application`)
@@ -812,11 +815,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		});
 
 		// Send application to new-applications channel for moderators
-		const newApplicationsChannel = guild.channels.cache.find(
-			(channel) =>
-				channel.name === 'new-applications' &&
-				channel.type === ChannelType.GuildText,
-		);
+		const newApplicationsChannel = interaction.client.channels.cache.get('1440071317956067328');
 
 		if (newApplicationsChannel) {
 			const applicationEmbed = new EmbedBuilder()
