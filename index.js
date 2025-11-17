@@ -4,6 +4,9 @@ const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const { token } = require('./config.json');
 
+console.log('Bot starting...');
+console.log('Discord.js loaded successfully');
+
 // Create a new client instance
 const client = new Client({
 	intents: [
@@ -12,6 +15,8 @@ const client = new Client({
 		GatewayIntentBits.GuildMessages,
 	],
 });
+
+console.log('Client created successfully');
 
 // Load commands
 client.commands = new Collection();
@@ -59,5 +64,19 @@ for (const file of eventFiles) {
 	}
 }
 
+// Add error handlers
+client.on('error', error => {
+	console.error('Discord client error:', error);
+});
+
+process.on('unhandledRejection', error => {
+	console.error('Unhandled promise rejection:', error);
+});
+
 // Log in to Discord with your client's token
-client.login(token);
+console.log('Attempting to log in to Discord...');
+client.login(token).catch(error => {
+	console.error('Failed to log in to Discord:');
+	console.error(error);
+	process.exit(1);
+});

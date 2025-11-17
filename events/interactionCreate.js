@@ -462,20 +462,16 @@ module.exports = {
 					const appData = interaction.client.applicationData?.get(userId);
 					if (appData && appData.threadId) {
 						try {
-						const applicationChannel = guild.channels.cache.find(
-							(channel) =>
-								channel.name === 'application' &&
-								channel.type === ChannelType.GuildText,
-						);
-						if (applicationChannel) {
-							const thread = await applicationChannel.threads.fetch(appData.threadId);
-							if (thread) {
-								await thread.setLocked(true);
-								await thread.setArchived(true);
+							const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
+							if (applicationChannel) {
+								const thread = await applicationChannel.threads.fetch(appData.threadId);
+								if (thread) {
+									await thread.setLocked(true);
+									await thread.setArchived(true);
+								}
 							}
-						}
-					} catch (threadError) {
-						console.error('Error closing application thread:', threadError);
+						} catch (threadError) {
+							console.error('Error closing application thread:', threadError);
 						}
 					}
 
@@ -731,11 +727,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		// Create a thread in the 'application' channel
 		let threadLink = null;
 		let threadId = null;
-		const applicationChannel = guild.channels.cache.find(
-			(channel) =>
-				channel.name === 'application' &&
-				channel.type === ChannelType.GuildText,
-		);
+		const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
 
 		if (applicationChannel) {
 			try {

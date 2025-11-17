@@ -14,33 +14,12 @@ module.exports = {
 			return;
 		}
 
-		// Try to find the #application channel
-		let applicationChannel = guild.channels.cache.find(
-			channel => channel.name === 'application' && channel.type === ChannelType.GuildText,
-		);
+		// Use the specific application channel ID
+		const applicationChannel = client.channels.cache.get('1434215324265222164');
 
-		// If application channel doesn't exist, find the default text channel
+		// If application channel doesn't exist, log error and return
 		if (!applicationChannel) {
-			console.error('Application channel not found! Attempting to send to default text channel...');
-
-			// Try to find the system channel or any text channel the bot can send messages to
-			applicationChannel = guild.systemChannel || guild.channels.cache.find(
-				channel => channel.type === ChannelType.GuildText && channel.permissionsFor(guild.members.me).has('SendMessages'),
-			);
-
-			if (!applicationChannel) {
-				console.error('No available text channel found to send the application message!');
-				return;
-			}
-
-			// Send error embed to the default channel
-			const errorEmbed = new EmbedBuilder()
-				.setTitle('⚠️ Configuration Error')
-				.setDescription('The #application channel does not exist. Please create a channel named "application" for the application system to work properly.')
-				.setColor(0xFF0000)
-				.setTimestamp();
-
-			await applicationChannel.send({ embeds: [errorEmbed] });
+			console.error('Application channel not found! Make sure the bot has access to channel ID: 1434215324265222164');
 			return;
 		}
 
