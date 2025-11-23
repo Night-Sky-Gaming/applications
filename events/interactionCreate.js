@@ -752,6 +752,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				const thread = await applicationChannel.threads.create({
 					name: threadName,
 					autoArchiveDuration: 60, // Archive after 60 minutes of inactivity
+					type: ChannelType.PrivateThread,
 					reason: `Application thread for ${member.user.tag}`,
 				});
 
