@@ -782,15 +782,8 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				threadLink = thread.url;
 				threadId = thread.id;
 
-				// Delete the automatic system message from the application channel
-				try {
-					const starterMessage = await applicationChannel.messages.fetch(thread.id);
-					if (starterMessage) {
-						await starterMessage.delete();
-					}
-				} catch (deleteError) {
-					console.error('Error deleting thread starter message:', deleteError);
-				}
+				// Note: Private threads don't create a starter message in the parent channel,
+				// so there's no need to delete anything
 			}
 			catch (threadError) {
 				console.error('Error creating application thread:', threadError);
