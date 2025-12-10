@@ -714,21 +714,23 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			descriptionText += `\n\n⚠️ **Note:** Could not change your nickname automatically (${nicknameErrorReason}). Please contact a moderator if you want your nickname changed.`;
 		}
 
-	// Build game fields text
-	const mainGameText = mainGame;
-	const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
+		// Build game fields text
+		const mainGameText = mainGame;
+		const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
 
-	// Get account creation date
-	const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-	});
+		// Get account creation date
+		const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
 
-	// Create a thread in the 'application' channel
-	let threadLink = null;
-	let threadId = null;
-	const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');		if (applicationChannel) {
+		// Create a thread in the 'application' channel
+		let threadLink = null;
+		let threadId = null;
+		const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
+
+		if (applicationChannel) {
 			try {
 				const currentDate = new Date().toLocaleDateString('en-US', {
 					year: 'numeric',
@@ -738,12 +740,12 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				const threadName = `${appData.username}'s application - ${currentDate}`;
 
 				// Create thread
-				const thread = await applicationChannel.threads.create({
-					name: threadName,
-					autoArchiveDuration: 60, // Archive after 60 minutes of inactivity
-					type: ChannelType.PrivateThread,
-					reason: `Application thread for ${member.user.tag}`,
-				});
+			const thread = await applicationChannel.threads.create({
+				name: threadName,
+				autoArchiveDuration: 60, // Archive after 60 minutes of inactivity
+				type: ChannelType.PrivateThread,
+				reason: `Application thread for ${member.user.tag}`,
+			});
 
 		// Add the applicant to the thread so they can participate
 		await thread.members.add(member.user.id);
@@ -761,26 +763,26 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				{ name: 'Other Game Types', value: otherGamesText, inline: true },
 			)
 			.setThumbnail(member.user.displayAvatarURL())
-			.setTimestamp();				await thread.send({ embeds: [threadEmbed] });
+			.setTimestamp();
 
-				// Tag the role and the applicant user
-				await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
+		await thread.send({ embeds: [threadEmbed] });
 
-				threadLink = thread.url;
-				threadId = thread.id;
+		// Tag the role and the applicant user
+		await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
 
-				// Note: Private threads don't create a starter message in the parent channel,
-				// so there's no need to delete anything
-			}
-			catch (threadError) {
-				console.error('Error creating application thread:', threadError);
-			}
-		}
-		else {
-			console.error('application channel not found!');
-		}
+		threadLink = thread.url;
+		threadId = thread.id;
 
-		const successEmbed = new EmbedBuilder()
+		// Note: Private threads don't create a starter message in the parent channel,
+		// so there's no need to delete anything
+	}
+	catch (threadError) {
+		console.error('Error creating application thread:', threadError);
+	}
+}
+else {
+	console.error('application channel not found!');
+}		const successEmbed = new EmbedBuilder()
 			.setTitle(
 				roleAdded
 					? '✅ Application Submitted!'
