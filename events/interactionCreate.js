@@ -770,19 +770,21 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		// Tag the role and the applicant user
 		await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
 
-		threadLink = thread.url;
-		threadId = thread.id;
+			threadLink = thread.url;
+			threadId = thread.id;
 
-		// Note: Private threads don't create a starter message in the parent channel,
-		// so there's no need to delete anything
+			// Note: Private threads don't create a starter message in the parent channel,
+			// so there's no need to delete anything
+		}
+		catch (threadError) {
+			console.error('Error creating application thread:', threadError);
+		}
 	}
-	catch (threadError) {
-		console.error('Error creating application thread:', threadError);
+	else {
+		console.error('application channel not found!');
 	}
-}
-else {
-	console.error('application channel not found!');
-}		const successEmbed = new EmbedBuilder()
+
+		const successEmbed = new EmbedBuilder()
 			.setTitle(
 				roleAdded
 					? '✅ Application Submitted!'
