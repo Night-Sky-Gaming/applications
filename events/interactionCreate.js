@@ -714,16 +714,21 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			descriptionText += `\n\n⚠️ **Note:** Could not change your nickname automatically (${nicknameErrorReason}). Please contact a moderator if you want your nickname changed.`;
 		}
 
-		// Build game fields text
-		const mainGameText = mainGame;
-		const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
+	// Build game fields text
+	const mainGameText = mainGame;
+	const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
 
-		// Create a thread in the 'application' channel
-		let threadLink = null;
-		let threadId = null;
-		const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
+	// Get account creation date
+	const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+	});
 
-		if (applicationChannel) {
+	// Create a thread in the 'application' channel
+	let threadLink = null;
+	let threadId = null;
+	const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');		if (applicationChannel) {
 			try {
 				const currentDate = new Date().toLocaleDateString('en-US', {
 					year: 'numeric',
@@ -740,30 +745,23 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 					reason: `Application thread for ${member.user.tag}`,
 				});
 
-				// Add the applicant to the thread so they can participate
-				await thread.members.add(member.user.id);
+		// Add the applicant to the thread so they can participate
+		await thread.members.add(member.user.id);
 
-				// Send initial message to thread
-				const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: 'short',
-					day: 'numeric',
-				});
-				const threadEmbed = new EmbedBuilder()
-					.setTitle(`${appData.username}'s Application`)
-					.setDescription(`Application submitted by ${member.user.tag}`)
-					.setColor(0x5865f2)
-					.addFields(
-						{ name: 'Username', value: appData.username, inline: true },
-						{ name: 'Age', value: appData.age, inline: true },
-						{ name: 'Account Created', value: accountCreated, inline: true },
-						{ name: 'Main Game Type', value: mainGameText, inline: true },
-						{ name: 'Other Game Types', value: otherGamesText, inline: true },
-					)
-					.setThumbnail(member.user.displayAvatarURL())
-					.setTimestamp();
-
-				await thread.send({ embeds: [threadEmbed] });
+		// Send initial message to thread
+		const threadEmbed = new EmbedBuilder()
+			.setTitle(`${appData.username}'s Application`)
+			.setDescription(`Application submitted by ${member.user.tag}`)
+			.setColor(0x5865f2)
+			.addFields(
+				{ name: 'Username', value: appData.username, inline: true },
+				{ name: 'Age', value: appData.age, inline: true },
+				{ name: 'Account Created', value: accountCreated, inline: true },
+				{ name: 'Main Game Type', value: mainGameText, inline: true },
+				{ name: 'Other Game Types', value: otherGamesText, inline: true },
+			)
+			.setThumbnail(member.user.displayAvatarURL())
+			.setTimestamp();				await thread.send({ embeds: [threadEmbed] });
 
 				// Tag the role and the applicant user
 				await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
