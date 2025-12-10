@@ -777,10 +777,10 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		catch (threadError) {
 			console.error('Error creating application thread:', threadError);
 		}
-	}
-	else {
-		console.error('application channel not found!');
-	}
+		}
+		else {
+			console.error('application channel not found!');
+		}
 
 		const successEmbed = new EmbedBuilder()
 			.setTitle(
@@ -805,9 +805,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		await interaction.editReply({
 			embeds: [successEmbed],
 			components: [],
-		});
-
-		// Send application to new-applications channel for moderators
+		});		// Send application to new-applications channel for moderators
 		const newApplicationsChannel = interaction.client.channels.cache.get('1440071317956067328');
 
 		if (newApplicationsChannel) {
@@ -847,17 +845,19 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			);
 
 			// Store the application data for later use when buttons are clicked
-			if (!interaction.client.applicationData) {
+				if (!interaction.client.applicationData) {
 				interaction.client.applicationData = new Map();
 			}
 
-		interaction.client.applicationData.set(member.user.id, {
-			username: appData.username,
-			age: appData.age,
-			mainGame: mainGame,
-			otherGames: otherGames,
-			threadId: threadId,
-		});			await newApplicationsChannel.send({
+			interaction.client.applicationData.set(member.user.id, {
+				username: appData.username,
+				age: appData.age,
+				mainGame: mainGame,
+				otherGames: otherGames,
+				threadId: threadId,
+			});
+
+			await newApplicationsChannel.send({
 				embeds: [applicationEmbed],
 				components: [buttonRow],
 			});
