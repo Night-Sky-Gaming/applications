@@ -739,7 +739,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				});
 				const threadName = `${appData.username}'s application - ${currentDate}`;
 
-				// Create thread
+			// Create thread
 			const thread = await applicationChannel.threads.create({
 				name: threadName,
 				autoArchiveDuration: 60, // Archive after 60 minutes of inactivity
@@ -747,33 +747,31 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				reason: `Application thread for ${member.user.tag}`,
 			});
 
-		// Add the applicant to the thread so they can participate
-		await thread.members.add(member.user.id);
+			// Add the applicant to the thread so they can participate
+			await thread.members.add(member.user.id);
 
-		// Send initial message to thread
-		const threadEmbed = new EmbedBuilder()
-			.setTitle(`${appData.username}'s Application`)
-			.setDescription(`Application submitted by ${member.user.tag}`)
-			.setColor(0x5865f2)
-			.addFields(
-				{ name: 'Username', value: appData.username, inline: true },
-				{ name: 'Age', value: appData.age, inline: true },
-				{ name: 'Account Created', value: accountCreated, inline: true },
-				{ name: 'Main Game Type', value: mainGameText, inline: true },
-				{ name: 'Other Game Types', value: otherGamesText, inline: true },
-			)
-			.setThumbnail(member.user.displayAvatarURL())
-			.setTimestamp();
+			// Send initial message to thread
+			const threadEmbed = new EmbedBuilder()
+				.setTitle(`${appData.username}'s Application`)
+				.setDescription(`Application submitted by ${member.user.tag}`)
+				.setColor(0x5865f2)
+				.addFields(
+					{ name: 'Username', value: appData.username, inline: true },
+					{ name: 'Age', value: appData.age, inline: true },
+					{ name: 'Account Created', value: accountCreated, inline: true },
+					{ name: 'Main Game Type', value: mainGameText, inline: true },
+					{ name: 'Other Game Types', value: otherGamesText, inline: true },
+				)
+				.setThumbnail(member.user.displayAvatarURL())
+				.setTimestamp();
 
-		await thread.send({ embeds: [threadEmbed] });
+			await thread.send({ embeds: [threadEmbed] });
 
-		// Tag the role and the applicant user
-		await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
+			// Tag the role and the applicant user
+			await thread.send({ content: `<@&1434216081177972848> ${member.user}` });
 
 			threadLink = thread.url;
-			threadId = thread.id;
-
-			// Note: Private threads don't create a starter message in the parent channel,
+			threadId = thread.id;			// Note: Private threads don't create a starter message in the parent channel,
 			// so there's no need to delete anything
 		}
 		catch (threadError) {
