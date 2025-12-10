@@ -279,22 +279,12 @@ module.exports = {
 					.setPlaceholder('Enter your age...')
 					.setRequired(true);
 
-				const reasonInput = new TextInputBuilder()
-					.setCustomId('reason_input')
-					.setLabel('Why do you want to join Andromeda Gaming?')
-					.setStyle(TextInputStyle.Paragraph)
-					.setMinLength(10)
-					.setMaxLength(1000)
-					.setPlaceholder('Tell us why you want to join...')
-					.setRequired(true);
-
 				// Add inputs to action rows
 				const row1 = new ActionRowBuilder().addComponents(usernameInput);
 				const row2 = new ActionRowBuilder().addComponents(ageInput);
-				const row3 = new ActionRowBuilder().addComponents(reasonInput);
 
 				// Add all action rows to the modal
-				modal.addComponents(row1, row2, row3);
+				modal.addComponents(row1, row2);
 
 				// Show the modal
 				await interaction.showModal(modal);
@@ -330,12 +320,9 @@ module.exports = {
 					.getTextInputValue('username_input')
 					.trim();
 				const age = interaction.fields.getTextInputValue('age_input').trim();
-				const reason = interaction.fields
-					.getTextInputValue('reason_input')
-					.trim();
 
 			// Create a select menu for main game type (single selection)
-			const mainGameSelect = new StringSelectMenuBuilder()
+			 const mainGameSelect = new StringSelectMenuBuilder()
 				.setCustomId(`main_game_select_${interaction.user.id}`)
 				.setPlaceholder('Select your MAIN game type')
 				.setMinValues(1)
@@ -373,10 +360,7 @@ module.exports = {
 				interaction.client.pendingApplications.set(interaction.user.id, {
 					username,
 					age,
-					reason,
-				});
-
-			// Send the main game type selection menu
+				});			// Send the main game type selection menu
 			const selectEmbed = new EmbedBuilder()
 				.setTitle('📝 Select Your Main Game Type')
 				.setDescription(
@@ -760,6 +744,11 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				await thread.members.add(member.user.id);
 
 				// Send initial message to thread
+				const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+				});
 				const threadEmbed = new EmbedBuilder()
 					.setTitle(`${appData.username}'s Application`)
 					.setDescription(`Application submitted by ${member.user.tag}`)
@@ -767,7 +756,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 					.addFields(
 						{ name: 'Username', value: appData.username, inline: true },
 						{ name: 'Age', value: appData.age, inline: true },
-						{ name: 'Why join?', value: appData.reason },
+						{ name: 'Account Created', value: accountCreated, inline: true },
 						{ name: 'Main Game Type', value: mainGameText, inline: true },
 						{ name: 'Other Game Types', value: otherGamesText, inline: true },
 					)
@@ -804,7 +793,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			.addFields(
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
-				{ name: 'Why join?', value: appData.reason },
+				{ name: 'Account Created', value: accountCreated, inline: true },
 				{ name: 'Main Game Type', value: mainGameText, inline: true },
 				{ name: 'Other Game Types', value: otherGamesText, inline: true },
 			)
@@ -831,7 +820,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				.addFields(
 					{ name: 'Username', value: appData.username, inline: true },
 					{ name: 'Age', value: appData.age, inline: true },
-					{ name: 'Why join?', value: appData.reason },
+					{ name: 'Account Created', value: accountCreated, inline: true },
 					{ name: 'Main Game Type', value: mainGameText, inline: true },
 					{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
 				)
@@ -865,7 +854,6 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		interaction.client.applicationData.set(member.user.id, {
 			username: appData.username,
 			age: appData.age,
-			reason: appData.reason,
 			mainGame: mainGame,
 			otherGames: otherGames,
 			threadId: threadId,
