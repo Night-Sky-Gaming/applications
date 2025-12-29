@@ -80,6 +80,36 @@ module.exports = {
 					}
 
 					if (isAccept) {
+						// Get application data first to check if suspicious
+						const appData = interaction.client.applicationData?.get(userId);
+
+						// If suspicious account, show confirmation modal
+						if (appData && appData.isSuspicious) {
+							const confirmModal = new ModalBuilder()
+								.setCustomId(`confirm_accept_suspicious_${userId}`)
+								.setTitle('⚠️ Confirm Acceptance');
+
+							const confirmInput = new TextInputBuilder()
+								.setCustomId('confirm_input')
+								.setLabel('Type CONFIRM to accept this new account')
+								.setStyle(TextInputStyle.Short)
+								.setPlaceholder('CONFIRM')
+								.setMinLength(7)
+								.setMaxLength(7)
+								.setRequired(true);
+
+							const confirmRow = new ActionRowBuilder().addComponents(confirmInput);
+							confirmModal.addComponents(confirmRow);
+
+							const warningMessage = `⚠️ **WARNING: New Account**\n\nThis account is only **${appData.accountAgeDays} days old**.\n\nAre you sure you want to accept this application?`;
+							
+							// Store warning message in the modal's text input value
+							confirmInput.setValue('');
+
+							await interaction.showModal(confirmModal);
+							return;
+						}
+
 						// Accept application - give Member role and game roles
 						const memberRole = guild.roles.cache.find(
 							(role) => role.name === 'Member',
@@ -93,9 +123,6 @@ module.exports = {
 							});
 							return;
 						}
-
-						// Get application data
-						const appData = interaction.client.applicationData?.get(userId);
 
 						try {
 							// Add Member role
@@ -482,6 +509,228 @@ module.exports = {
 					});
 				}
 			}
+			// Handle confirmation modal for suspicious account acceptance
+			else if (interaction.customId.startsWith('confirm_accept_suspicious_')) {
+				const userId = interaction.customId.split('_').pop();
+				const confirmText = interaction.fields
+					.getTextInputValue('confirm_input')
+					.trim()
+					.toUpperCase();
+
+				if (confirmText !== 'CONFIRM') {
+					await interaction.reply({
+						content: '❌ Confirmation failed. You must type "CONFIRM" exactly to accept this application.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				// Confirmation successful, proceed with acceptance
+				const guild = interaction.guild;
+
+				if (!guild) {
+					await interaction.reply({
+						content: 'Unable to find the server.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				try {
+					const member = await guild.members.fetch(userId);
+
+					if (!member) {
+						await interaction.reply({
+							content:
+								'Unable to find this user in the server. They may have left.',
+								flags: MessageFlags.Ephemeral,
+							});
+						return;
+					}
+
+					// Accept application - give Member role and game roles
+					const memberRole = guild.roles.cache.find(
+						(role) => role.name === 'Member',
+					);
+
+					if (!memberRole) {
+						await interaction.reply({
+							content:
+								'The "Member" role does not exist. Please create it first.',
+								flags: MessageFlags.Ephemeral,
+							});
+						return;
+					}
+
+					// Get application data
+					const appData = interaction.client.applicationData?.get(userId);
+
+					try {
+						// Add Member role
+						await member.roles.add(memberRole);
+
+						// Remove Applicant role
+						const applicantRole = guild.roles.cache.find(
+							(role) => role.name === 'Applicant',
+						);
+						if (applicantRole && member.roles.cache.has(applicantRole.id)) {
+							await member.roles.remove(applicantRole);
+						}
+
+						// Add ONLY the main game role (not other games)
+						let mainGameRoleAdded = false;
+						let mainGameRoleMissing = false;
+
+						if (appData && appData.mainGame) {
+							console.log(`Looking for main game role: "${appData.mainGame}"`);
+							console.log('Available roles:', guild.roles.cache.map(r => `"${r.name}"`).join(', '));
+							
+							const mainGameRole = guild.roles.cache.find(
+								(role) => role.name === appData.mainGame,
+							);
+							
+							if (mainGameRole) {
+								console.log(`Found role: ${mainGameRole.name} (ID: ${mainGameRole.id})`);
+								try {
+									await member.roles.add(mainGameRole);
+									mainGameRoleAdded = true;
+									console.log(`Successfully added role ${mainGameRole.name} to ${member.user.tag}`);
+								}
+								catch (roleError) {
+									console.error(
+										`Error adding main game role ${appData.mainGame}:`,
+										roleError.message,
+									);
+									mainGameRoleMissing = true;
+								}
+							}
+							else {
+								console.log(`Role "${appData.mainGame}" not found in server`);
+								mainGameRoleMissing = true;
+							}
+						}
+
+						// Find the original message in new-applications channel to update
+						const newApplicationsChannel = guild.channels.cache.get('1440071317956067328');
+						let messageToUpdate = null;
+						
+						if (newApplicationsChannel) {
+							try {
+								// Search recent messages to find the application
+								const messages = await newApplicationsChannel.messages.fetch({ limit: 50 });
+								for (const msg of messages.values()) {
+									if (msg.embeds.length > 0 && msg.embeds[0].footer?.text === `User ID: ${userId}`) {
+										messageToUpdate = msg;
+										break;
+									}
+								}
+							} catch (fetchError) {
+								console.error('Error fetching messages:', fetchError);
+							}
+						}
+
+						if (messageToUpdate) {
+							// Update the message
+							const originalEmbed = messageToUpdate.embeds[0];
+							const acceptedEmbed = EmbedBuilder.from(originalEmbed)
+								.setColor(0x00ff00)
+								.setTitle('✅ Application Accepted')
+								.addFields({
+									name: 'Processed By',
+									value: `${interaction.user.tag}`,
+									inline: true,
+								});
+
+							if (mainGameRoleAdded) {
+								acceptedEmbed.addFields({
+									name: 'Main Game Type Role Added',
+									value: appData.mainGame,
+								});
+							}
+
+							if (mainGameRoleMissing) {
+								acceptedEmbed.addFields({
+									name: '⚠️ Main Game Type Role Missing',
+									value: appData.mainGame || 'Unknown',
+								});
+							}
+
+							if (appData && appData.otherGames && appData.otherGames.length > 0) {
+								acceptedEmbed.addFields({
+									name: 'ℹ️ Other Game Types (Level 5+ Access)',
+									value: appData.otherGames.join(', '),
+								});
+							}
+
+							await messageToUpdate.edit({
+								embeds: [acceptedEmbed],
+								components: [],
+							});
+						}
+
+						// Notify the user
+						try {
+							const dmEmbed = new EmbedBuilder()
+								.setTitle('✅ Application Accepted!')
+								.setDescription(
+									'Your application to Andromeda Gaming has been accepted!',
+								)
+								.setColor(0x00ff00)
+								.setTimestamp();
+
+							await member.send({ embeds: [dmEmbed] });
+						}
+						catch {
+							console.log(`Could not DM user ${member.user.tag}`);
+						}
+
+						// Close the application thread
+						if (appData && appData.threadId) {
+							try {
+								const applicationChannel = guild.channels.cache.find(
+									(channel) =>
+										channel.name === 'application' &&
+										channel.type === ChannelType.GuildText,
+								);
+								if (applicationChannel) {
+									const thread = await applicationChannel.threads.fetch(appData.threadId);
+									if (thread) {
+										await thread.setLocked(true);
+										await thread.setArchived(true);
+									}
+								}
+							} catch (threadError) {
+								console.error('Error closing application thread:', threadError);
+							}
+						}
+
+						// Clean up application data
+						if (interaction.client.applicationData) {
+							interaction.client.applicationData.delete(userId);
+						}
+
+						// Reply to the modal
+						await interaction.reply({
+							content: '✅ Application accepted successfully after confirmation.',
+							flags: MessageFlags.Ephemeral,
+						});
+					}
+					catch (error) {
+						console.error('Error accepting application:', error);
+						await interaction.reply({
+							content: `Error accepting application: ${error.message}`,
+							flags: MessageFlags.Ephemeral,
+						});
+					}
+				}
+				catch (error) {
+					console.error('Error processing confirmed acceptance:', error);
+					await interaction.reply({
+						content: `Error processing application: ${error.message}`,
+						flags: MessageFlags.Ephemeral,
+					});
+				}
+			}
 		}
 		// Handle select menu interactions
 		else if (interaction.isStringSelectMenu()) {
@@ -809,22 +1058,37 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		const newApplicationsChannel = interaction.client.channels.cache.get('1440071317956067328');
 
 		if (newApplicationsChannel) {
+			// Check account age
+			const accountCreated = member.user.createdAt;
+			const accountAge = Date.now() - accountCreated.getTime();
+			const accountAgeDays = Math.floor(accountAge / (1000 * 60 * 60 * 24));
+			const isSuspicious = accountAgeDays < 30;
+
 			const applicationEmbed = new EmbedBuilder()
 				.setTitle('📋 New Application')
 				.setDescription(
 					`**Applicant:** ${member.user.tag} (${member.user.id})`,
 				)
-				.setColor(0x5865f2)
+				.setColor(isSuspicious ? 0xffa500 : 0x5865f2)
 				.addFields(
 					{ name: 'Username', value: appData.username, inline: true },
 					{ name: 'Age', value: appData.age, inline: true },
-					{ name: 'Account Created', value: accountCreated, inline: true },
+					{ name: 'Account Created', value: `<t:${Math.floor(accountCreated.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
+					{ name: 'Why join?', value: appData.reason },
 					{ name: 'Main Game Type', value: mainGameText, inline: true },
 					{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
 				)
 				.setThumbnail(member.user.displayAvatarURL())
 				.setFooter({ text: `User ID: ${member.user.id}` })
 				.setTimestamp();
+
+			// Add warning if account is less than 30 days old
+			if (isSuspicious) {
+				applicationEmbed.addFields({
+					name: '⚠️ WARNING',
+					value: '**New Account Detected!** This account is less than 30 days old.',
+				});
+			}
 
 			// Create Accept and Deny buttons
 			const acceptButton = new ButtonBuilder()
@@ -852,12 +1116,12 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			interaction.client.applicationData.set(member.user.id, {
 				username: appData.username,
 				age: appData.age,
-				mainGame: mainGame,
-				otherGames: otherGames,
-				threadId: threadId,
-			});
-
-			await newApplicationsChannel.send({
+			reason: appData.reason,
+			mainGame: mainGame,
+			otherGames: otherGames,
+			threadId: threadId,
+			isSuspicious: isSuspicious,
+			accountAgeDays: accountAgeDays,
 				embeds: [applicationEmbed],
 				components: [buttonRow],
 			});
