@@ -967,16 +967,15 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		const mainGameText = mainGame;
 		const otherGamesText = otherGames.length > 0 ? otherGames.join(', ') : 'None';
 
-		// Get account creation date
-		const accountCreated = member.user.createdAt.toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-		});
-
-		// Create a thread in the 'application' channel
-		let threadLink = null;
-		let threadId = null;
+	// Get account creation date and age
+	const accountCreatedDate = member.user.createdAt;
+	const accountCreated = accountCreatedDate.toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+	});
+	const accountAge = Date.now() - accountCreatedDate.getTime();
+	const accountAgeDays = Math.floor(accountAge / (1000 * 60 * 60 * 24));
 		const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
 
 		if (applicationChannel) {
@@ -1054,29 +1053,25 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		await interaction.editReply({
 			embeds: [successEmbed],
 			components: [],
-		});		// Send application to new-applications channel for moderators
-		const newApplicationsChannel = interaction.client.channels.cache.get('1440071317956067328');
+	});
 
-		if (newApplicationsChannel) {
-			// Check account age
-			const accountCreated = member.user.createdAt;
-			const accountAge = Date.now() - accountCreated.getTime();
-			const accountAgeDays = Math.floor(accountAge / (1000 * 60 * 60 * 24));
-			const isSuspicious = accountAgeDays < 30;
+	// Send application to new-applications channel for moderators
+	const newApplicationsChannel = interaction.client.channels.cache.get('1440071317956067328');
 
-			const applicationEmbed = new EmbedBuilder()
-				.setTitle('📋 New Application')
-				.setDescription(
-					`**Applicant:** ${member.user.tag} (${member.user.id})`,
-				)
-				.setColor(isSuspicious ? 0xffa500 : 0x5865f2)
-				.addFields(
-					{ name: 'Username', value: appData.username, inline: true },
-					{ name: 'Age', value: appData.age, inline: true },
-					{ name: 'Account Created', value: `<t:${Math.floor(accountCreated.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
-					{ name: 'Why join?', value: appData.reason },
-					{ name: 'Main Game Type', value: mainGameText, inline: true },
-					{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
+	if (newApplicationsChannel) {
+		// Check if account is suspicious (less than 30 days old)
+		const isSuspicious = accountAgeDays < 30;
+
+		const applicationEmbed = new EmbedBuilder()
+			.setTitle('📋 New Application')
+			.setDescription(
+				`**Applicant:** ${member.user.tag} (${member.user.id})`,
+			)
+			.setColor(isSuspicious ? 0xffa500 : 0x5865f2)
+			.addFields(
+				{ name: 'Username', value: appData.username, inline: true },
+				{ name: 'Age', value: appData.age, inline: true },
+				{ name: 'Account Created', value: `<t:${Math.floor(accountCreatedDate.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
 				)
 				.setThumbnail(member.user.displayAvatarURL())
 				.setFooter({ text: `User ID: ${member.user.id}` })
