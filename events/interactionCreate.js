@@ -1072,8 +1072,11 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
 				{ name: 'Account Created', value: `<t:${Math.floor(accountCreatedDate.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
-				)
-				.setThumbnail(member.user.displayAvatarURL())
+				{ name: 'Why join?', value: appData.reason },
+				{ name: 'Main Game Type', value: mainGameText, inline: true },
+				{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
+			)
+			.setThumbnail(member.user.displayAvatarURL())
 				.setFooter({ text: `User ID: ${member.user.id}` })
 				.setTimestamp();
 
@@ -1104,40 +1107,44 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			);
 
 			// Store the application data for later use when buttons are clicked
-				if (!interaction.client.applicationData) {
-				interaction.client.applicationData = new Map();
-			}
+		if (!interaction.client.applicationData) {
+		interaction.client.applicationData = new Map();
+	}
 
-			interaction.client.applicationData.set(member.user.id, {
-				username: appData.username,
-				age: appData.age,
-			reason: appData.reason,
-			mainGame: mainGame,
-			otherGames: otherGames,
-			threadId: threadId,
-			isSuspicious: isSuspicious,
-			accountAgeDays: accountAgeDays,
-				embeds: [applicationEmbed],
-				components: [buttonRow],
-			});
+	interaction.client.applicationData.set(member.user.id, {
+		username: appData.username,
+		age: appData.age,
+		reason: appData.reason,
+		mainGame: mainGame,
+		otherGames: otherGames,
+		threadId: threadId,
+		isSuspicious: isSuspicious,
+		accountAgeDays: accountAgeDays,
+	});
 
-			// Send thread link message to new-applications channel
-			if (threadLink) {
-				await newApplicationsChannel.send({
-					content: threadLink,
-				});
-			}
-		}
-		else {
-			console.error('new-applications channel not found!');
-		}
+	// Send application embed with buttons to new-applications channel
+	await newApplicationsChannel.send({
+		embeds: [applicationEmbed],
+		components: [buttonRow],
+	});
 
-		// Clean up the pending application data
-		interaction.client.pendingApplications.delete(interaction.user.id);
+	// Also send thread link if it exists
+	if (threadLink) {
+		await newApplicationsChannel.send({
+			content: `📋 Application Thread: ${threadLink}`,
+		});
+	}
+}
+else {
+	console.error('new-applications channel not found!');
+}
 
-		console.log(
-			`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Main Game: ${mainGame}, Other Games: ${otherGames.join(', ')}`,
-		);
+// Clean up the pending application data
+interaction.client.pendingApplications.delete(interaction.user.id);
+
+console.log(
+	`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Main Game: ${mainGame}, Other Games: ${otherGames.join(', ')}`,
+);
 	}
 	catch (error) {
 		console.error('Error processing application:', error);
