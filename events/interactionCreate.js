@@ -194,7 +194,7 @@ module.exports = {
 
 						if (appData && appData.otherGames && appData.otherGames.length > 0) {
 							acceptedEmbed.addFields({
-								name: 'ℹ️ Other Game Types (Level 5+ Access)',
+								name: 'ℹ️ Other Game Types (Level 3+ Access)',
 								value: appData.otherGames.join(', '),
 							});
 						}							await interaction.update({
@@ -657,7 +657,7 @@ module.exports = {
 
 							if (appData && appData.otherGames && appData.otherGames.length > 0) {
 								acceptedEmbed.addFields({
-									name: 'ℹ️ Other Game Types (Level 5+ Access)',
+									name: 'ℹ️ Other Game Types (Level 3+ Access)',
 									value: appData.otherGames.join(', '),
 								});
 							}
@@ -802,7 +802,7 @@ module.exports = {
 				.setDescription(
 					`**Your Main Game Type:** ${mainGame}\n\n` +
 					'Select any **other game types** you play from the dropdown menu below.\n\n' +
-					'⚠️ **Note:** You will get access to these game type channels once you reach **Level 5**.\n\n' +
+					'⚠️ **Note:** You will get access to these game type channels once you reach **Level 3**.\n\n' +
 					'If you only play your main game type, click the "Skip" button.',
 				)
 					.setColor(0x5865f2)
@@ -1072,9 +1072,8 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
 				{ name: 'Account Created', value: `<t:${Math.floor(accountCreatedDate.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
-				{ name: 'Why join?', value: appData.reason },
 				{ name: 'Main Game Type', value: mainGameText, inline: true },
-				{ name: 'Other Game Types (Level 5+)', value: otherGamesText, inline: true },
+				{ name: 'Other Game Types (Level 3+)', value: otherGamesText, inline: true },
 			)
 			.setThumbnail(member.user.displayAvatarURL())
 				.setFooter({ text: `User ID: ${member.user.id}` })
