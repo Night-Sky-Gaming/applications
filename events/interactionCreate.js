@@ -101,11 +101,6 @@ module.exports = {
 							const confirmRow = new ActionRowBuilder().addComponents(confirmInput);
 							confirmModal.addComponents(confirmRow);
 
-							const warningMessage = `⚠️ **WARNING: New Account**\n\nThis account is only **${appData.accountAgeDays} days old**.\n\nAre you sure you want to accept this application?`;
-							
-							// Store warning message in the modal's text input value
-							confirmInput.setValue('');
-
 							await interaction.showModal(confirmModal);
 							return;
 						}
