@@ -520,13 +520,15 @@ module.exports = {
 					return;
 				}
 
+				// Defer reply immediately to prevent interaction timeout
+				await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
 				// Confirmation successful, proceed with acceptance
 				const guild = interaction.guild;
 
 				if (!guild) {
-					await interaction.reply({
+					await interaction.editReply({
 						content: 'Unable to find the server.',
-						flags: MessageFlags.Ephemeral,
 					});
 					return;
 				}
@@ -535,10 +537,9 @@ module.exports = {
 					const member = await guild.members.fetch(userId);
 
 					if (!member) {
-						await interaction.reply({
+						await interaction.editReply({
 							content:
 								'Unable to find this user in the server. They may have left.',
-								flags: MessageFlags.Ephemeral,
 							});
 						return;
 					}
@@ -549,10 +550,9 @@ module.exports = {
 					);
 
 					if (!memberRole) {
-						await interaction.reply({
+						await interaction.editReply({
 							content:
 								'The "Member" role does not exist. Please create it first.',
-								flags: MessageFlags.Ephemeral,
 							});
 						return;
 					}
@@ -705,24 +705,21 @@ module.exports = {
 						}
 
 						// Reply to the modal
-						await interaction.reply({
+						await interaction.editReply({
 							content: '✅ Application accepted successfully after confirmation.',
-							flags: MessageFlags.Ephemeral,
 						});
 					}
 					catch (error) {
 						console.error('Error accepting application:', error);
-						await interaction.reply({
+						await interaction.editReply({
 							content: `Error accepting application: ${error.message}`,
-							flags: MessageFlags.Ephemeral,
 						});
 					}
 				}
 				catch (error) {
 					console.error('Error processing confirmed acceptance:', error);
-					await interaction.reply({
+					await interaction.editReply({
 						content: `Error processing application: ${error.message}`,
-						flags: MessageFlags.Ephemeral,
 					});
 				}
 			}
