@@ -30,7 +30,7 @@ module.exports = {
 			.setColor(0x5865F2)
 			.addFields(
 				{ name: '📝 Application Process', value: 'Fill out the form with your information and we\'ll review your application!' },
-				{ name: '✨ What happens next?', value: 'After submitting, you\'ll receive the Member role and your nickname will be updated!' },
+				{ name: '✨ What happens next?', value: 'After being accepted, you\'ll receive the Member role and your nickname will be updated!' },
 			)
 			.setFooter({ text: 'Andromeda Gaming Applications' })
 			.setTimestamp();
