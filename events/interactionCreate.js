@@ -162,6 +162,38 @@ module.exports = {
 								console.log(`Role "${appData.mainGame}" not found in server`);
 								mainGameRoleMissing = true;
 							}
+					// Add region role if available
+					let regionRoleAdded = false;
+					let regionRoleMissing = false;
+
+					if (appData && appData.region) {
+						console.log(`Looking for region role: "${appData.region}"`);
+						
+						const regionRole = guild.roles.cache.find(
+							(role) => role.name === appData.region,
+						);
+						
+						if (regionRole) {
+							console.log(`Found role: ${regionRole.name} (ID: ${regionRole.id})`);
+							try {
+								await member.roles.add(regionRole);
+								regionRoleAdded = true;
+								console.log(`Successfully added region role ${regionRole.name} to ${member.user.tag}`);
+							}
+							catch (roleError) {
+								console.error(
+									`Error adding region role ${appData.region}:`,
+									roleError.message,
+								);
+								regionRoleMissing = true;
+							}
+						}
+						else {
+							console.log(`Role "${appData.region}" not found in server`);
+							regionRoleMissing = true;
+						}
+					}
+
 						}							// Update the message
 							const originalEmbed = interaction.message.embeds[0];
 							const acceptedEmbed = EmbedBuilder.from(originalEmbed)
@@ -187,30 +219,44 @@ module.exports = {
 							});
 						}
 
-						if (appData && appData.otherGames && appData.otherGames.length > 0) {
-							acceptedEmbed.addFields({
-								name: 'ℹ️ Other Game Types (Level 3+ Access)',
-								value: appData.otherGames.join(', '),
-							});
-						}							await interaction.update({
-								embeds: [acceptedEmbed],
-								components: [],
-							});
+					if (regionRoleAdded) {
+						acceptedEmbed.addFields({
+							name: 'Region Role Added',
+							value: appData.region,
+						});
+					}
 
-						// Notify the user
-						try {
-							const dmEmbed = new EmbedBuilder()
-								.setTitle('✅ Application Accepted!')
-								.setDescription(
-									'Your application to Andromeda Gaming has been accepted!',
-								)
-								.setColor(0x00ff00)
-								.setTimestamp();
+					if (regionRoleMissing) {
+						acceptedEmbed.addFields({
+							name: '⚠️ Region Role Missing',
+							value: appData.region || 'Unknown',
+						});
+					}
 
-							await member.send({ embeds: [dmEmbed] });
-						}
-						catch {
-							console.log(`Could not DM user ${member.user.tag}`);
+				if (appData && appData.otherGames && appData.otherGames.length > 0) {
+					acceptedEmbed.addFields({
+						name: 'ℹ️ Other Game Types (Level 3+ Access)',
+						value: appData.otherGames.join(', '),
+					});
+				}							await interaction.update({
+							embeds: [acceptedEmbed],
+							components: [],
+						});
+
+					// Notify the user
+					try {
+						const dmEmbed = new EmbedBuilder()
+							.setTitle('✅ Application Accepted!')
+							.setDescription(
+								'Your application to Andromeda Gaming has been accepted!',
+							)
+							.setColor(0x00ff00)
+							.setTimestamp();
+
+						await member.send({ embeds: [dmEmbed] });
+					}
+					catch {
+						console.log(`Could not DM user ${member.user.tag}`);
 						}
 
 						// Close the application thread
@@ -330,8 +376,8 @@ module.exports = {
 					interaction.user.id,
 				);
 				
-				// Complete the application with no other games
-				await completeApplicationSubmission(interaction, appData, []);
+				// Show region selection instead of completing application
+				await showRegionSelection(interaction, appData);
 			}
 		}
 		// Handle modal submissions
@@ -598,6 +644,39 @@ module.exports = {
 									);
 									mainGameRoleMissing = true;
 								}
+
+						// Add region role if available
+						let regionRoleAdded = false;
+						let regionRoleMissing = false;
+
+						if (appData && appData.region) {
+							console.log(`Looking for region role: "${appData.region}"`);
+							
+							const regionRole = guild.roles.cache.find(
+								(role) => role.name === appData.region,
+							);
+							
+							if (regionRole) {
+								console.log(`Found role: ${regionRole.name} (ID: ${regionRole.id})`);
+								try {
+									await member.roles.add(regionRole);
+									regionRoleAdded = true;
+									console.log(`Successfully added region role ${regionRole.name} to ${member.user.tag}`);
+								}
+								catch (roleError) {
+									console.error(
+										`Error adding region role ${appData.region}:`,
+										roleError.message,
+									);
+									regionRoleMissing = true;
+								}
+							}
+							else {
+								console.log(`Role "${appData.region}" not found in server`);
+								regionRoleMissing = true;
+							}
+						}
+
 							}
 							else {
 								console.log(`Role "${appData.mainGame}" not found in server`);
@@ -647,6 +726,20 @@ module.exports = {
 								acceptedEmbed.addFields({
 									name: '⚠️ Main Game Type Role Missing',
 									value: appData.mainGame || 'Unknown',
+								});
+							}
+
+							if (regionRoleAdded) {
+								acceptedEmbed.addFields({
+									name: 'Region Role Added',
+									value: appData.region,
+								});
+							}
+
+							if (regionRoleMissing) {
+								acceptedEmbed.addFields({
+									name: '⚠️ Region Role Missing',
+									value: appData.region || 'Unknown',
 								});
 							}
 
@@ -826,15 +919,97 @@ module.exports = {
 				// Array of selected other games
 				const otherGames = interaction.values;
 				
-				// Complete the application submission
-				await completeApplicationSubmission(interaction, appData, otherGames);
+				// Store other games in app data
+				appData.otherGames = otherGames;
+				interaction.client.pendingApplications.set(interaction.user.id, appData);
+				
+				// Show region selection instead of completing application
+				await showRegionSelection(interaction, appData);
+			}
+			// Handle region selection
+			else if (interaction.customId.startsWith('region_select_')) {
+				// Get the stored application data
+				if (
+					!interaction.client.pendingApplications ||
+					!interaction.client.pendingApplications.has(interaction.user.id)
+				) {
+					await interaction.reply({
+						content:
+							'Your application data expired. Please submit your application again.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				const appData = interaction.client.pendingApplications.get(
+					interaction.user.id,
+				);
+				
+				// Get selected region
+				const region = interaction.values[0];
+				
+				// Complete the application submission with region
+				await completeApplicationSubmission(interaction, appData, appData.otherGames || [], region);
 			}
 		}
 	},
 };
 
+// Helper function to show region selection
+async function showRegionSelection(interaction, appData) {
+	// Create region selection menu
+	const regionSelect = new StringSelectMenuBuilder()
+		.setCustomId(`region_select_${interaction.user.id}`)
+		.setPlaceholder('Select your region')
+		.setMinValues(1)
+		.setMaxValues(1)
+		.addOptions(
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Europe')
+				.setValue('Europe')
+				.setEmoji('🇪🇺'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('North America')
+				.setValue('North America')
+				.setEmoji('🌎'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('South America')
+				.setValue('South America')
+				.setEmoji('🌎'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Oceania')
+				.setValue('Oceania')
+				.setEmoji('🌏'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Asia')
+				.setValue('Asia')
+				.setEmoji('🌏'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Africa')
+				.setValue('Africa')
+				.setEmoji('🌍'),
+		);
+
+	const selectRow = new ActionRowBuilder().addComponents(regionSelect);
+
+	// Send region selection menu
+	const regionEmbed = new EmbedBuilder()
+		.setTitle('🌍 Select Your Region')
+		.setDescription(
+			'Please select your region from the dropdown menu below.\n\n' +
+			'You will receive a region role upon acceptance.',
+		)
+		.setColor(0x5865f2)
+		.setTimestamp();
+
+	await interaction.update({
+		embeds: [regionEmbed],
+		components: [selectRow],
+	});
+}
+
 // Helper function to complete application submission
-async function completeApplicationSubmission(interaction, appData, otherGames) {
+async function completeApplicationSubmission(interaction, appData, otherGames, region) {
 	const mainGame = appData.mainGame;
 
 	// Defer the interaction immediately to prevent timeout
@@ -998,6 +1173,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 				.addFields(
 					{ name: 'Username', value: appData.username, inline: true },
 					{ name: 'Age', value: appData.age, inline: true },
+					{ name: 'Region', value: region, inline: true },
 					{ name: 'Account Created', value: accountCreated, inline: true },
 					{ name: 'Main Game Type', value: mainGameText, inline: true },
 					{ name: 'Other Game Types', value: otherGamesText, inline: true },
@@ -1033,6 +1209,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			.addFields(
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
+				{ name: 'Region', value: region, inline: true },
 				{ name: 'Account Created', value: accountCreated, inline: true },
 				{ name: 'Main Game Type', value: mainGameText, inline: true },
 				{ name: 'Other Game Types', value: otherGamesText, inline: true },
@@ -1063,6 +1240,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 			.addFields(
 				{ name: 'Username', value: appData.username, inline: true },
 				{ name: 'Age', value: appData.age, inline: true },
+				{ name: 'Region', value: region, inline: true },
 				{ name: 'Account Created', value: `<t:${Math.floor(accountCreatedDate.getTime() / 1000)}:R> (${accountAgeDays} days ago)`, inline: false },
 				{ name: 'Main Game Type', value: mainGameText, inline: true },
 				{ name: 'Other Game Types (Level 3+)', value: otherGamesText, inline: true },
@@ -1108,6 +1286,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames) {
 		reason: appData.reason,
 		mainGame: mainGame,
 		otherGames: otherGames,
+		region: region,
 		threadId: threadId,
 		isSuspicious: isSuspicious,
 		accountAgeDays: accountAgeDays,
@@ -1134,7 +1313,7 @@ else {
 interaction.client.pendingApplications.delete(interaction.user.id);
 
 console.log(
-	`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Main Game: ${mainGame}, Other Games: ${otherGames.join(', ')}`,
+	`Application submitted by ${interaction.user.tag} (${appData.username}) - Role: ${roleAdded ? 'Added' : 'Failed'}, Nickname: ${nicknameChanged ? 'Changed' : 'Failed'}, Main Game: ${mainGame}, Other Games: ${otherGames.join(', ')}, Region: ${region}`,
 );
 	}
 	catch (error) {
