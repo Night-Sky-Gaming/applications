@@ -135,6 +135,9 @@ module.exports = {
 						let mainGameRoleAdded = false;
 						let mainGameRoleMissing = false;
 
+						let regionRoleAdded = false;
+						let regionRoleMissing = false;
+
 						if (appData && appData.mainGame) {
 							console.log(`Looking for main game role: "${appData.mainGame}"`);
 							console.log('Available roles:', guild.roles.cache.map(r => `"${r.name}"`).join(', '));
@@ -162,11 +165,9 @@ module.exports = {
 								console.log(`Role "${appData.mainGame}" not found in server`);
 								mainGameRoleMissing = true;
 							}
-					// Add region role if available
-					let regionRoleAdded = false;
-					let regionRoleMissing = false;
 
-					if (appData && appData.region) {
+						// Add region role if available
+						if (appData && appData.region) {
 						console.log(`Looking for region role: "${appData.region}"`);
 						
 						const regionRole = guild.roles.cache.find(
@@ -622,6 +623,9 @@ module.exports = {
 						let mainGameRoleAdded = false;
 						let mainGameRoleMissing = false;
 
+						let regionRoleAdded = false;
+						let regionRoleMissing = false;
+
 						if (appData && appData.mainGame) {
 							console.log(`Looking for main game role: "${appData.mainGame}"`);
 							console.log('Available roles:', guild.roles.cache.map(r => `"${r.name}"`).join(', '));
@@ -646,9 +650,6 @@ module.exports = {
 								}
 
 						// Add region role if available
-						let regionRoleAdded = false;
-						let regionRoleMissing = false;
-
 						if (appData && appData.region) {
 							console.log(`Looking for region role: "${appData.region}"`);
 							
