@@ -322,6 +322,67 @@ module.exports = {
 					});
 				}
 			}
+			// Handle close application button (member left)
+			else if (interaction.customId.startsWith('close_application_')) {
+				const userId = interaction.customId.split('_').pop();
+
+				const guild = interaction.guild;
+				if (!guild) {
+					await interaction.reply({
+						content: 'Unable to find the server.',
+						flags: MessageFlags.Ephemeral,
+					});
+					return;
+				}
+
+				try {
+					const originalEmbed = interaction.message.embeds[0];
+					const closedEmbed = EmbedBuilder.from(originalEmbed)
+						.setColor(0x808080)
+						.setTitle('🚪 Application Closed — Member Left')
+						.addFields({
+							name: 'Closed By',
+							value: `${interaction.user.tag}`,
+							inline: true,
+						});
+
+					await interaction.update({
+						embeds: [closedEmbed],
+						components: [],
+					});
+
+					// Close the application thread if one exists
+					const appData = interaction.client.applicationData?.get(userId);
+					if (appData && appData.threadId) {
+						try {
+							const applicationChannel = interaction.client.channels.cache.get('1434215324265222164');
+							if (applicationChannel) {
+								const thread = await applicationChannel.threads.fetch(appData.threadId);
+								if (thread) {
+									await thread.send('🚪 This application has been closed because the applicant left the server.');
+									await thread.setLocked(true);
+									await thread.setArchived(true);
+								}
+							}
+						}
+						catch (threadError) {
+							console.error('Error closing application thread:', threadError);
+						}
+					}
+
+					// Clean up application data
+					if (interaction.client.applicationData) {
+						interaction.client.applicationData.delete(userId);
+					}
+				}
+				catch (error) {
+					console.error('Error closing application:', error);
+					await interaction.reply({
+						content: `Error closing application: ${error.message}`,
+						flags: MessageFlags.Ephemeral,
+					});
+				}
+			}
 			// Handle create application button
 			else if (interaction.customId === 'create_application') {
 				// Create the modal
@@ -1258,7 +1319,7 @@ async function completeApplicationSubmission(interaction, appData, otherGames, r
 				});
 			}
 
-			// Create Accept and Deny buttons
+			// Create Accept, Deny and Close buttons
 			const acceptButton = new ButtonBuilder()
 				.setCustomId(`accept_application_${member.user.id}`)
 				.setLabel('Accept')
@@ -1271,9 +1332,16 @@ async function completeApplicationSubmission(interaction, appData, otherGames, r
 				.setStyle(ButtonStyle.Danger)
 				.setEmoji('❌');
 
+			const closeButton = new ButtonBuilder()
+				.setCustomId(`close_application_${member.user.id}`)
+				.setLabel('Close (Member Left)')
+				.setStyle(ButtonStyle.Secondary)
+				.setEmoji('🚪');
+
 			const buttonRow = new ActionRowBuilder().addComponents(
 				acceptButton,
 				denyButton,
+				closeButton,
 			);
 
 			// Store the application data for later use when buttons are clicked
